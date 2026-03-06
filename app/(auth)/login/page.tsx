@@ -1,0 +1,27 @@
+"use client";
+import { useSearchParams } from "next/navigation";
+import { createClient } from "@/lib/supabase-browser";
+
+export default function LoginPage() {
+  const searchParams = useSearchParams();
+  const error = searchParams.get("error");
+
+  const signIn = async () => {
+    const supabase = createClient();
+    await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo: `${window.location.origin}/admin` }
+    });
+  };
+
+  return (
+    <main className="container">
+      <div className="card" style={{ maxWidth: 460, margin: "96px auto" }}>
+        <h1>Humor Admin Login</h1>
+        <p>Access is limited to profiles.is_superadmin = TRUE.</p>
+        {error === "not_superadmin" ? <p style={{ color: "#ff8d8d" }}>Not a superadmin.</p> : null}
+        <button onClick={signIn}>Continue with Google</button>
+      </div>
+    </main>
+  );
+}
