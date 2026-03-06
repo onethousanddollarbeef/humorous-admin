@@ -1,5 +1,16 @@
 import { createClient } from "@/lib/supabase-server";
 
+type Row = Record<string, any>;
+
+function pickDate(row: Row) {
+  const value = row.created_at ?? row.created_datetime_utc ?? row.inserted_at ?? row.updated_at;
+  return value ? new Date(value).toLocaleString() : "-";
+}
+
+function pickOwner(row: Row) {
+  return row.user_id ?? row.profile_id ?? row.owner_id ?? "-";
+}
+
 export default async function DashboardPage() {
   const supabase = createClient();
 
@@ -7,14 +18,16 @@ export default async function DashboardPage() {
     supabase.from("profiles").select("id", { count: "exact", head: true }),
     supabase.from("images").select("id", { count: "exact", head: true }),
     supabase.from("captions").select("id", { count: "exact", head: true }),
-    supabase
-      .from("images")
-      .select("id, created_at, user_id")
-      .order("created_at", { ascending: false })
-      .limit(8)
+    supabase.from("images").select("*").limit(8)
   ]);
 
-  const burstiness = (recentImages?.length ?? 0) >= 5 ? "🔥 Meme storm" : "🌱 Slow drip";
+  const sortedRecent = [...(recentImages ?? [])].sort((a: Row, b: Row) => {
+    const ta = new Date(a.created_at ?? a.created_datetime_utc ?? 0).getTime();
+    const tb = new Date(b.created_at ?? b.created_datetime_utc ?? 0).getTime();
+    return tb - ta;
+  });
+
+  const burstiness = (sortedRecent.length ?? 0) >= 5 ? "🔥 Meme storm" : "🌱 Slow drip";
 
   return (
     <main className="grid" style={{ gap: 16 }}>
@@ -44,18 +57,24 @@ export default async function DashboardPage() {
           <thead>
             <tr>
               <th>Image ID</th>
-              <th>User ID</th>
+              <th>Owner ID</th>
               <th>Created</th>
             </tr>
           </thead>
           <tbody>
-            {(recentImages ?? []).map((item) => (
-              <tr key={item.id}>
-                <td>{item.id}</td>
-                <td>{item.user_id ?? "-"}</td>
-                <td>{new Date(item.created_at).toLocaleString()}</td>
+            {sortedRecent.length === 0 ? (
+              <tr>
+                <td colSpan={3}>No images found.</td>
               </tr>
-            ))}
+            ) : (
+              sortedRecent.map((item: Row) => (
+                <tr key={item.id}>
+                  <td>{item.id}</td>
+                  <td>{pickOwner(item)}</td>
+                  <td>{pickDate(item)}</td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </section>
