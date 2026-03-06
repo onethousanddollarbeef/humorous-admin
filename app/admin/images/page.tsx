@@ -16,10 +16,31 @@ async function createImage(formData: FormData) {
   const supabase = createClient();
   const url = String(formData.get("url") ?? "").trim();
   const title = String(formData.get("title") ?? "").trim();
+  const file = formData.get("file") as File | null;
 
-  if (!url) return;
+  let resolvedUrl = url;
 
-  const payloads = [{ url, title }, { image_url: url, title }, { src: url, title }, { path: url, title }];
+  if (!resolvedUrl && file && file.size > 0) {
+    const extension = file.name.includes(".") ? file.name.split(".").pop() : "bin";
+    const path = `${Date.now()}-${Math.random().toString(36).slice(2)}.${extension}`;
+    const { error: uploadError } = await supabase.storage.from("images").upload(path, file, {
+      contentType: file.type || undefined
+    });
+
+    if (!uploadError) {
+      const { data } = supabase.storage.from("images").getPublicUrl(path);
+      resolvedUrl = data.publicUrl;
+    }
+  }
+
+  if (!resolvedUrl) return;
+
+  const payloads = [
+    { url: resolvedUrl, title },
+    { image_url: resolvedUrl, title },
+    { src: resolvedUrl, title },
+    { path: resolvedUrl, title }
+  ];
   for (const payload of payloads) {
     const { error } = await supabase.from("images").insert(payload as any);
     if (!error) break;
@@ -60,9 +81,10 @@ export default async function ImagesPage() {
     <main className="grid">
       <section className="card">
         <h1>Images CRUD</h1>
-        <form action={createImage} className="grid" style={{ gridTemplateColumns: "2fr 2fr auto" }}>
-          <input type="url" name="url" placeholder="https://..." required />
+        <form action={createImage} className="grid" style={{ gridTemplateColumns: "2fr 2fr 2fr auto" }}>
+          <input type="url" name="url" placeholder="https://... (optional if uploading file)" />
           <input name="title" placeholder="image title" />
+          <input type="file" name="file" accept="image/*" />
           <button type="submit">Create</button>
         </form>
       </section>
