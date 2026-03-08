@@ -14,10 +14,23 @@ function pickOwner(row: Row) {
 export default async function DashboardPage() {
   const supabase = createClient();
 
-  const [{ count: users }, { count: images }, { count: captions }, { data: recentImages }] = await Promise.all([
+  const [
+    { count: users },
+    { count: images },
+    { count: captions },
+    { count: requests },
+    { count: terms },
+    { count: models },
+    { count: domains },
+    { data: recentImages }
+  ] = await Promise.all([
     supabase.from("profiles").select("id", { count: "exact", head: true }),
     supabase.from("images").select("id", { count: "exact", head: true }),
     supabase.from("captions").select("id", { count: "exact", head: true }),
+    supabase.from("caption_requests").select("id", { count: "exact", head: true }),
+    supabase.from("terms").select("id", { count: "exact", head: true }),
+    supabase.from("llm_models").select("id", { count: "exact", head: true }),
+    supabase.from("allowed_signup_domains").select("id", { count: "exact", head: true }),
     supabase.from("images").select("*").limit(8)
   ]);
 
@@ -44,6 +57,22 @@ export default async function DashboardPage() {
         <div className="card">
           <h3>Total Captions</h3>
           <p>{captions ?? 0}</p>
+        </div>
+        <div className="card">
+          <h3>Caption Requests</h3>
+          <p>{requests ?? 0}</p>
+        </div>
+        <div className="card">
+          <h3>Terms</h3>
+          <p>{terms ?? 0}</p>
+        </div>
+        <div className="card">
+          <h3>LLM Models</h3>
+          <p>{models ?? 0}</p>
+        </div>
+        <div className="card">
+          <h3>Allowed Domains</h3>
+          <p>{domains ?? 0}</p>
         </div>
         <div className="card">
           <h3>Upload Tempo</h3>
