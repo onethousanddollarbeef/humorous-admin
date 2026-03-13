@@ -1,14 +1,18 @@
 import { createClient } from "@/lib/supabase-server";
+
+type Row = Record<string, any>;
+
+function pickDate(row: Row) {
+  const value = row.created_at ?? row.created_datetime_utc ?? row.inserted_at ?? row.updated_at;
+  return value ? new Date(value).toLocaleString() : "-";
+}
+
+function pickOwner(row: Row) {
+  return row.user_id ?? row.profile_id ?? row.owner_id ?? "-";
+}
+
 export default async function DashboardPage() {
   const supabase = createClient();
-<<<<<<< HEAD
-  const [{ count: users }, { count: images }, { count: captions }] = await Promise.all([
-    supabase.from("profiles").select("id", { count: "exact", head: true }),
-    supabase.from("images").select("id", { count: "exact", head: true }),
-    supabase.from("captions").select("id", { count: "exact", head: true })
-  ]);
-  return <main className="card"><h1>Admin Analytics</h1><p>Profiles: {users ?? 0}</p><p>Images: {images ?? 0}</p><p>Captions: {captions ?? 0}</p></main>;
-=======
 
   const [
     { count: users },
@@ -105,5 +109,4 @@ export default async function DashboardPage() {
       </section>
     </main>
   );
->>>>>>> 1c3b408 (Add broad admin coverage for humor, LLM, terms, and domain/email tables)
 }
