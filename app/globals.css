@@ -44,6 +44,13 @@ a {
   color: var(--gold);
 }
 
+
+.admin-sidebar-subtitle {
+  margin: 8px 0 0;
+  color: #cdc6ad;
+  font-size: 0.92rem;
+}
+
 .admin-nav-groups {
   display: grid;
   gap: 16px;

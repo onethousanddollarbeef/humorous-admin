@@ -26,7 +26,7 @@ const navSections = [
     ] as const
   },
   {
-    title: "Humor Config",
+    title: "Config",
     links: [
       ["Humor Flavors", "/admin/humor-flavors"],
       ["Flavor Steps", "/admin/humor-flavor-steps"],
@@ -63,8 +63,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
   return (
     <div className="container admin-shell">
-      <aside className="admin-sidebar card">
+      <aside className="admin-sidebar card" aria-label="Admin navigation sidebar">
         <h2>Humorous Admin</h2>
+        <p className="admin-sidebar-subtitle">Choose a section to manage data quickly.</p>
         <div className="admin-nav-groups">
           {navSections.map((section) => (
             <section key={section.title}>
