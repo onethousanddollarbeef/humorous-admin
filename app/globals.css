@@ -26,6 +26,47 @@ a {
   padding: 24px;
 }
 
+.admin-shell {
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.admin-sidebar {
+  position: sticky;
+  top: 16px;
+}
+
+.admin-sidebar h2,
+.admin-sidebar h3 {
+  margin: 0;
+  color: var(--gold);
+}
+
+.admin-nav-groups {
+  display: grid;
+  gap: 16px;
+  margin: 16px 0;
+}
+
+.admin-sidebar .links {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.admin-sidebar .links a {
+  border: 1px solid #3f3720;
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: #101521;
+}
+
+.admin-content {
+  min-width: 0;
+}
+
 .card {
   background: #131722;
   border: 1px solid #3f3720;
@@ -76,19 +117,6 @@ button {
   color: var(--gold);
 }
 
-nav {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 18px;
-}
-
-nav .links {
-  display: flex;
-  gap: 10px;
-}
-
-nav .links a,
 h1,
 h2,
 h3,
@@ -100,4 +128,14 @@ strong {
 a:hover,
 button:hover {
   color: #f3d574;
+}
+
+@media (max-width: 960px) {
+  .admin-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-sidebar {
+    position: static;
+  }
 }

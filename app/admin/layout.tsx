@@ -9,24 +9,42 @@ async function signOut() {
   redirect("/login");
 }
 
-const links = [
-  ["Dashboard", "/admin"],
-  ["Users", "/admin/users"],
-  ["Images", "/admin/images"],
-  ["Captions", "/admin/captions"],
-  ["Humor Flavors", "/admin/humor-flavors"],
-  ["Flavor Steps", "/admin/humor-flavor-steps"],
-  ["Humor Mix", "/admin/humor-mix"],
-  ["Example Captions", "/admin/example-captions"],
-  ["Terms", "/admin/terms"],
-  ["Caption Requests", "/admin/caption-requests"],
-  ["Caption Examples", "/admin/caption-examples"],
-  ["LLM Models", "/admin/llm-models"],
-  ["LLM Providers", "/admin/llm-providers"],
-  ["Prompt Chains", "/admin/llm-prompt-chains"],
-  ["LLM Responses", "/admin/llm-responses"],
-  ["Allowed Domains", "/admin/allowed-signup-domains"],
-  ["Whitelisted Emails", "/admin/whitelisted-email-addresses"]
+const navSections = [
+  {
+    title: "Overview",
+    links: [["Dashboard", "/admin"]] as const
+  },
+  {
+    title: "Content",
+    links: [
+      ["Users", "/admin/users"],
+      ["Images", "/admin/images"],
+      ["Captions", "/admin/captions"],
+      ["Caption Requests", "/admin/caption-requests"],
+      ["Caption Examples", "/admin/caption-examples"],
+      ["Example Captions", "/admin/example-captions"]
+    ] as const
+  },
+  {
+    title: "Humor Config",
+    links: [
+      ["Humor Flavors", "/admin/humor-flavors"],
+      ["Flavor Steps", "/admin/humor-flavor-steps"],
+      ["Humor Mix", "/admin/humor-mix"],
+      ["Terms", "/admin/terms"],
+      ["Allowed Domains", "/admin/allowed-signup-domains"],
+      ["Whitelisted Emails", "/admin/whitelisted-email-addresses"]
+    ] as const
+  },
+  {
+    title: "LLMs",
+    links: [
+      ["LLM Models", "/admin/llm-models"],
+      ["LLM Providers", "/admin/llm-providers"],
+      ["Prompt Chains", "/admin/llm-prompt-chains"],
+      ["LLM Responses", "/admin/llm-responses"]
+    ] as const
+  }
 ] as const;
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -44,20 +62,28 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   }
 
   return (
-    <div className="container">
-      <nav>
-        <div className="links" style={{ flexWrap: "wrap" }}>
-          {links.map(([label, href]) => (
-            <Link key={href} href={href}>
-              {label}
-            </Link>
+    <div className="container admin-shell">
+      <aside className="admin-sidebar card">
+        <h2>Humorous Admin</h2>
+        <div className="admin-nav-groups">
+          {navSections.map((section) => (
+            <section key={section.title}>
+              <h3>{section.title}</h3>
+              <div className="links">
+                {section.links.map(([label, href]) => (
+                  <Link key={href} href={href}>
+                    {label}
+                  </Link>
+                ))}
+              </div>
+            </section>
           ))}
         </div>
         <form action={signOut}>
           <button type="submit">Sign out</button>
         </form>
-      </nav>
-      {children}
+      </aside>
+      <div className="admin-content">{children}</div>
     </div>
   );
 }
