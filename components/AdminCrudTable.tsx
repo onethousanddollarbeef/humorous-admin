@@ -1,5 +1,6 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase-server";
+import { getCurrentAuditUserId, withCreateAuditFields, withUpdateAuditFields } from "@/lib/admin-audit";
 
 type Props = {
   title: string;
@@ -28,19 +29,21 @@ export default async function AdminCrudTable({
   async function createRow(formData: FormData) {
     "use server";
     const supabase = createClient();
+    const userId = await getCurrentAuditUserId();
     const payload = parsePayload(formData.get("payload"));
-    if (!payload) return;
-    await supabase.from(table).insert(payload);
+    if (!payload || !userId) return;
+    await supabase.from(table).insert(withCreateAuditFields(payload, userId));
     revalidatePath(path);
   }
 
   async function updateRow(formData: FormData) {
     "use server";
     const supabase = createClient();
+    const userId = await getCurrentAuditUserId();
     const id = String(formData.get("id") ?? "").trim();
     const payload = parsePayload(formData.get("payload"));
-    if (!id || !payload) return;
-    await supabase.from(table).update(payload).eq("id", id);
+    if (!id || !payload || !userId) return;
+    await supabase.from(table).update(withUpdateAuditFields(payload, userId)).eq("id", id);
     revalidatePath(path);
   }
 
@@ -61,6 +64,7 @@ export default async function AdminCrudTable({
       <section className="card">
         <h1>{title}</h1>
         {error ? <p style={{ color: "#ff8d8d" }}>Unable to load `{table}`: {error.message}</p> : null}
+        <p className="form-note">Audit fields are attached automatically on create and update.</p>
 
         {canCreate ? (
           <form action={createRow} className="grid">

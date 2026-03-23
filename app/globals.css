@@ -146,3 +146,10 @@ button:hover {
     position: static;
   }
 }
+
+
+.form-note {
+  margin: 0 0 12px;
+  color: #cdc6ad;
+  font-size: 0.92rem;
+}
