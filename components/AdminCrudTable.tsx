@@ -1,5 +1,6 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase-server";
+import { getCurrentProfileId } from "@/lib/admin-audit";
 
 type Props = {
   title: string;
@@ -28,19 +29,28 @@ export default async function AdminCrudTable({
   async function createRow(formData: FormData) {
     "use server";
     const supabase = createClient();
+    const profileId = await getCurrentProfileId();
     const payload = parsePayload(formData.get("payload"));
-    if (!payload) return;
-    await supabase.from(table).insert(payload);
+    if (!payload || !profileId) return;
+    await supabase.from(table).insert({
+      ...payload,
+      created_by_user_id: profileId,
+      modified_by_user_id: profileId
+    });
     revalidatePath(path);
   }
 
   async function updateRow(formData: FormData) {
     "use server";
     const supabase = createClient();
+    const profileId = await getCurrentProfileId();
     const id = String(formData.get("id") ?? "").trim();
     const payload = parsePayload(formData.get("payload"));
-    if (!id || !payload) return;
-    await supabase.from(table).update(payload).eq("id", id);
+    if (!id || !payload || !profileId) return;
+    await supabase
+      .from(table)
+      .update({ ...payload, modified_by_user_id: profileId })
+      .eq("id", id);
     revalidatePath(path);
   }
 
