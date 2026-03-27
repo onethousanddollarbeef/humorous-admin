@@ -44,20 +44,20 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   }
 
   return (
-    <div className="container">
-      <nav>
-        <div className="links" style={{ flexWrap: "wrap" }}>
+    <div className="container admin-shell">
+      <aside className="admin-sidebar">
+        <nav className="admin-nav">
           {links.map(([label, href]) => (
             <Link key={href} href={href}>
               {label}
             </Link>
           ))}
-        </div>
+        </nav>
         <form action={signOut}>
           <button type="submit">Sign out</button>
         </form>
-      </nav>
-      {children}
+      </aside>
+      <section className="admin-content">{children}</section>
     </div>
   );
 }

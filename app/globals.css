@@ -1,8 +1,10 @@
 :root {
   color-scheme: dark;
   font-family: "Bookmania", "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
-  --gold: #d4af37;
-  --gold-soft: #b9972f;
+  --pink: #f6b6d1;
+  --pink-soft: #d889ad;
+  --black: #050505;
+  --black-soft: #111111;
 }
 
 * {
@@ -11,8 +13,8 @@
 
 body {
   margin: 0;
-  background: #090b10;
-  color: #f2f3f5;
+  background: var(--black);
+  color: #ffd9e9;
 }
 
 a {
@@ -27,11 +29,11 @@ a {
 }
 
 .card {
-  background: #131722;
-  border: 1px solid #3f3720;
+  background: #141414;
+  border: 1px solid #3a1d2c;
   border-radius: 12px;
   padding: 16px;
-  box-shadow: inset 0 0 0 1px rgba(212, 175, 55, 0.08);
+  box-shadow: inset 0 0 0 1px rgba(246, 182, 209, 0.12);
 }
 
 .grid {
@@ -51,53 +53,86 @@ a {
 .table th,
 .table td {
   text-align: left;
-  border-bottom: 1px solid #2f2a1b;
+  border-bottom: 1px solid #311925;
   padding: 10px 8px;
 }
 
 .table th {
-  color: var(--gold);
+  color: var(--pink);
 }
 
 button,
 input,
 textarea,
 select {
-  border: 1px solid #4a4123;
-  background: #161c28;
-  color: #f2f3f5;
+  border: 1px solid #4a2438;
+  background: var(--black-soft);
+  color: #ffd9e9;
   border-radius: 8px;
   padding: 8px;
 }
 
 button {
   cursor: pointer;
-  background: linear-gradient(180deg, #2f2712 0%, #1e1a11 100%);
-  color: var(--gold);
+  background: linear-gradient(180deg, #321624 0%, #1c0e15 100%);
+  color: var(--pink);
 }
 
-nav {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 18px;
+.admin-shell {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  align-items: start;
+  gap: 20px;
 }
 
-nav .links {
-  display: flex;
-  gap: 10px;
+.admin-sidebar {
+  position: sticky;
+  top: 24px;
+  display: grid;
+  gap: 14px;
+  align-self: start;
+  background: #101010;
+  border: 1px solid #3a1d2c;
+  border-radius: 12px;
+  padding: 14px;
 }
 
-nav .links a,
+.admin-nav {
+  display: grid;
+  gap: 8px;
+}
+
+.admin-nav a {
+  border: 1px solid #4a2438;
+  border-radius: 8px;
+  background: #171717;
+  padding: 10px;
+}
+
+.admin-content {
+  min-width: 0;
+}
+
+.admin-nav a,
 h1,
 h2,
 h3,
 label,
 strong {
-  color: var(--gold);
+  color: var(--pink);
 }
 
 a:hover,
 button:hover {
-  color: #f3d574;
+  color: #ffd9e9;
+}
+
+@media (max-width: 900px) {
+  .admin-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-sidebar {
+    position: static;
+  }
 }
