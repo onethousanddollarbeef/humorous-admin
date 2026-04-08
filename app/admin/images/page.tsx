@@ -1,6 +1,6 @@
 import { revalidatePath } from "next/cache";
+import { getCurrentAuditUserId, withCreateAuditFields, withUpdateAuditFields } from "@/lib/admin-audit";
 import { createClient } from "@/lib/supabase-server";
-import { getCurrentProfileId } from "@/lib/admin-audit";
 
 type Row = Record<string, any>;
 
@@ -15,7 +15,7 @@ function imageTitle(row: Row) {
 async function createImage(formData: FormData) {
   "use server";
   const supabase = createClient();
-  const profileId = await getCurrentProfileId();
+  const userId = await getCurrentAuditUserId();
   const url = String(formData.get("url") ?? "").trim();
   const title = String(formData.get("title") ?? "").trim();
   const file = formData.get("file") as File | null;
@@ -35,7 +35,7 @@ async function createImage(formData: FormData) {
     }
   }
 
-  if (!resolvedUrl || !profileId) return;
+  if (!resolvedUrl || !userId) return;
 
   const payloads = [
     { url: resolvedUrl, title },
@@ -44,11 +44,7 @@ async function createImage(formData: FormData) {
     { path: resolvedUrl, title }
   ];
   for (const payload of payloads) {
-    const { error } = await supabase.from("images").insert({
-      ...payload,
-      created_by_user_id: profileId,
-      modified_by_user_id: profileId
-    } as any);
+    const { error } = await supabase.from("images").insert(withCreateAuditFields(payload, userId) as any);
     if (!error) break;
   }
 
@@ -58,18 +54,16 @@ async function createImage(formData: FormData) {
 async function updateImage(formData: FormData) {
   "use server";
   const supabase = createClient();
-  const profileId = await getCurrentProfileId();
+  const userId = await getCurrentAuditUserId();
   const id = String(formData.get("id"));
   const title = String(formData.get("title") ?? "").trim();
   const url = String(formData.get("url") ?? "").trim();
-  if (!profileId) return;
+
+  if (!userId) return;
 
   const payloads = [{ title, url }, { title, image_url: url }, { title, src: url }, { title, path: url }];
   for (const payload of payloads) {
-    const { error } = await supabase
-      .from("images")
-      .update({ ...payload, modified_by_user_id: profileId } as any)
-      .eq("id", id);
+    const { error } = await supabase.from("images").update(withUpdateAuditFields(payload, userId) as any).eq("id", id);
     if (!error) break;
   }
 
@@ -92,6 +86,7 @@ export default async function ImagesPage() {
     <main className="grid">
       <section className="card">
         <h1>Images CRUD</h1>
+        <p className="form-note">Audit fields are attached automatically when images are created or updated.</p>
         <form action={createImage} className="grid" style={{ gridTemplateColumns: "2fr 2fr 2fr auto" }}>
           <input type="url" name="url" placeholder="https://... (optional if uploading file)" />
           <input name="title" placeholder="image title" />

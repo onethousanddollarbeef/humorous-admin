@@ -1,36 +1,72 @@
+import Link from "next/link";
 import { createClient } from "@/lib/supabase-server";
 
 type Props = {
   title: string;
   table: string;
-  limit?: number;
+  path: string;
+  page?: number;
+  pageSize?: number;
 };
 
-export default async function AdminReadOnlyTable({ title, table, limit = 200 }: Props) {
+function displayValue(value: unknown) {
+  if (value === null || value === undefined) return "-";
+  if (typeof value === "object") return JSON.stringify(value);
+  return String(value);
+}
+
+export default async function AdminReadOnlyTable({ title, table, path, page = 1, pageSize = 25 }: Props) {
   const supabase = createClient();
-  const { data, error } = await supabase.from(table).select("*").limit(limit);
+  const from = (page - 1) * pageSize;
+  const to = from + pageSize - 1;
+  const [{ data, error }, { count }] = await Promise.all([
+    supabase.from(table).select("*").range(from, to),
+    supabase.from(table).select("*", { count: "exact", head: true })
+  ]);
+
+  const rows = (data ?? []) as Record<string, unknown>[];
+  const columns = Array.from(new Set(rows.flatMap((row) => Object.keys(row))));
+  const totalPages = Math.max(1, Math.ceil((count ?? 0) / pageSize));
+  const safePage = Math.min(page, totalPages);
 
   return (
     <main className="card">
       <h1>{title}</h1>
       {error ? <p style={{ color: "#ff8d8d" }}>Unable to load `{table}`: {error.message}</p> : null}
+
+      <div className="table-controls">
+        <strong>
+          Page {safePage} of {totalPages}
+        </strong>
+        <div className="pagination-links">
+          <Link aria-disabled={safePage <= 1} href={`${path}?page=${Math.max(1, safePage - 1)}`}>
+            Previous
+          </Link>
+          <Link aria-disabled={safePage >= totalPages} href={`${path}?page=${Math.min(totalPages, safePage + 1)}`}>
+            Next
+          </Link>
+        </div>
+      </div>
+
       <table className="table">
         <thead>
           <tr>
-            <th>Record</th>
+            {columns.map((column) => (
+              <th key={column}>{column}</th>
+            ))}
           </tr>
         </thead>
         <tbody>
-          {(data ?? []).length === 0 ? (
+          {rows.length === 0 ? (
             <tr>
-              <td>No rows found.</td>
+              <td colSpan={Math.max(columns.length, 1)}>No rows found.</td>
             </tr>
           ) : (
-            (data ?? []).map((row: Record<string, unknown>, index: number) => (
+            rows.map((row: Record<string, unknown>, index: number) => (
               <tr key={String((row.id as string | undefined) ?? index)}>
-                <td>
-                  <pre style={{ margin: 0, whiteSpace: "pre-wrap" }}>{JSON.stringify(row, null, 2)}</pre>
-                </td>
+                {columns.map((column) => (
+                  <td key={`${String((row.id as string | undefined) ?? index)}-${column}`}>{displayValue(row[column])}</td>
+                ))}
               </tr>
             ))
           )}
