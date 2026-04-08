@@ -1,5 +1,8 @@
 import AdminCrudTable from "@/components/AdminCrudTable";
 
-export default function Page() {
-  return <AdminCrudTable title="Terms (CRUD)" table="terms" path="/admin/terms" />;
+type Props = { searchParams?: { page?: string } };
+
+export default function Page({ searchParams }: Props) {
+  const page = Number(searchParams?.page ?? "1") > 0 ? Number(searchParams?.page ?? "1") : 1;
+  return <AdminCrudTable title="Terms (CRUD)" table="terms" path="/admin/terms" page={page} />;
 }

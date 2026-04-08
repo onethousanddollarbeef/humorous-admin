@@ -1,5 +1,8 @@
 import AdminReadOnlyTable from "@/components/AdminReadOnlyTable";
 
-export default function Page() {
-  return <AdminReadOnlyTable title="Caption Requests (Read Only)" table="caption_requests" />;
+type Props = { searchParams?: { page?: string } };
+
+export default function Page({ searchParams }: Props) {
+  const page = Number(searchParams?.page ?? "1") > 0 ? Number(searchParams?.page ?? "1") : 1;
+  return <AdminReadOnlyTable title="Caption Requests (Read Only)" table="caption_requests" path="/admin/caption-requests" page={page} />;
 }

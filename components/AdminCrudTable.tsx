@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase-server";
 import { getCurrentAuditUserId, withCreateAuditFields, withUpdateAuditFields } from "@/lib/admin-audit";
@@ -6,7 +7,9 @@ type Props = {
   title: string;
   table: string;
   path: string;
-  limit?: number;
+  page?: number;
+  pageSize?: number;
+  primaryKey?: string;
   canCreate?: boolean;
   canDelete?: boolean;
 };
@@ -18,11 +21,19 @@ function parsePayload(raw: FormDataEntryValue | null) {
   return JSON.parse(text) as Record<string, unknown>;
 }
 
+function displayValue(value: unknown) {
+  if (value === null || value === undefined) return "-";
+  if (typeof value === "object") return JSON.stringify(value);
+  return String(value);
+}
+
 export default async function AdminCrudTable({
   title,
   table,
   path,
-  limit = 200,
+  page = 1,
+  pageSize = 25,
+  primaryKey = "id",
   canCreate = true,
   canDelete = true
 }: Props) {
@@ -43,7 +54,7 @@ export default async function AdminCrudTable({
     const id = String(formData.get("id") ?? "").trim();
     const payload = parsePayload(formData.get("payload"));
     if (!id || !payload || !userId) return;
-    await supabase.from(table).update(withUpdateAuditFields(payload, userId)).eq("id", id);
+    await supabase.from(table).update(withUpdateAuditFields(payload, userId)).eq(primaryKey, id);
     revalidatePath(path);
   }
 
@@ -52,12 +63,22 @@ export default async function AdminCrudTable({
     const supabase = createClient();
     const id = String(formData.get("id") ?? "").trim();
     if (!id) return;
-    await supabase.from(table).delete().eq("id", id);
+    await supabase.from(table).delete().eq(primaryKey, id);
     revalidatePath(path);
   }
 
   const supabase = createClient();
-  const { data, error } = await supabase.from(table).select("*").limit(limit);
+  const from = (page - 1) * pageSize;
+  const to = from + pageSize - 1;
+  const [{ data, error }, { count }] = await Promise.all([
+    supabase.from(table).select("*").range(from, to),
+    supabase.from(table).select("*", { count: "exact", head: true })
+  ]);
+
+  const rows = (data ?? []) as Record<string, unknown>[];
+  const columns = Array.from(new Set(rows.flatMap((row) => Object.keys(row))));
+  const totalPages = Math.max(1, Math.ceil((count ?? 0) / pageSize));
+  const safePage = Math.min(page, totalPages);
 
   return (
     <main className="grid">
@@ -81,43 +102,67 @@ export default async function AdminCrudTable({
       </section>
 
       <section className="card">
+        <div className="table-controls">
+          <strong>
+            Page {safePage} of {totalPages}
+          </strong>
+          <div className="pagination-links">
+            <Link aria-disabled={safePage <= 1} href={`${path}?page=${Math.max(1, safePage - 1)}`}>
+              Previous
+            </Link>
+            <Link aria-disabled={safePage >= totalPages} href={`${path}?page=${Math.min(totalPages, safePage + 1)}`}>
+              Next
+            </Link>
+          </div>
+        </div>
+
         <table className="table">
           <thead>
             <tr>
-              <th>Record</th>
+              {columns.map((column) => (
+                <th key={column}>{column}</th>
+              ))}
               <th>Actions</th>
             </tr>
           </thead>
           <tbody>
-            {(data ?? []).length === 0 ? (
+            {rows.length === 0 ? (
               <tr>
-                <td colSpan={2}>No rows found.</td>
+                <td colSpan={columns.length + 1}>No rows found.</td>
               </tr>
             ) : (
-              (data ?? []).map((row: Record<string, unknown>, index: number) => {
-                const id = String((row.id as string | undefined) ?? "");
+              rows.map((row, index) => {
+                const id = String(row[primaryKey] ?? "");
                 return (
                   <tr key={id || String(index)}>
-                    <td>
-                      <pre style={{ margin: 0, whiteSpace: "pre-wrap" }}>{JSON.stringify(row, null, 2)}</pre>
-                    </td>
+                    {columns.map((column) => (
+                      <td key={`${id || index}-${column}`}>{displayValue(row[column])}</td>
+                    ))}
                     <td style={{ minWidth: 280 }}>
-                      <form action={updateRow} className="grid" style={{ marginBottom: 12 }}>
-                        <input type="hidden" name="id" value={id} />
-                        <textarea
-                          name="payload"
-                          rows={6}
-                          defaultValue={JSON.stringify(row, null, 2)}
-                          style={{ width: "100%" }}
-                        />
-                        <button type="submit">Update</button>
-                      </form>
-                      {canDelete ? (
-                        <form action={deleteRow}>
-                          <input type="hidden" name="id" value={id} />
-                          <button type="submit">Delete</button>
-                        </form>
-                      ) : null}
+                      {id ? (
+                        <>
+                          <form action={updateRow} className="grid" style={{ marginBottom: 12 }}>
+                            <input type="hidden" name="id" value={id} />
+                            <textarea
+                              name="payload"
+                              rows={6}
+                              defaultValue={JSON.stringify(row, null, 2)}
+                              style={{ width: "100%" }}
+                            />
+                            <button type="submit">Update</button>
+                          </form>
+                          {canDelete ? (
+                            <form action={deleteRow}>
+                              <input type="hidden" name="id" value={id} />
+                              <button type="submit">Delete</button>
+                            </form>
+                          ) : null}
+                        </>
+                      ) : (
+                        <p style={{ margin: 0, color: "#cdc6ad" }}>
+                          No `{primaryKey}` value for this row; update/delete disabled.
+                        </p>
+                      )}
                     </td>
                   </tr>
                 );
