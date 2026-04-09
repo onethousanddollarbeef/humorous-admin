@@ -12,6 +12,51 @@ function imageTitle(row: Row) {
   return row.title ?? row.name ?? row.caption ?? "";
 }
 
+function imageFlavor(row: Row) {
+  return row.humor_flavor_name ?? row.humor_flavor_id ?? row.flavor_name ?? row.flavor_id ?? "-";
+}
+
+function sanitizeFilename(name: string) {
+  return name.replace(/[^a-zA-Z0-9._-]/g, "_");
+}
+
+function candidateBuckets() {
+  const configured = process.env.SUPABASE_IMAGES_BUCKET;
+  return [...new Set([configured, "images", "image_uploads", "uploads"].filter(Boolean) as string[])];
+}
+
+async function uploadFileAndResolveUrl(file: File, preferredPathPrefix = "admin") {
+  const supabase = createClient();
+  const extension = file.name.includes(".") ? file.name.split(".").pop() : "bin";
+  const safeName = sanitizeFilename(file.name || `upload.${extension}`);
+  const path = `${preferredPathPrefix}/${Date.now()}-${Math.random().toString(36).slice(2)}-${safeName}`;
+  const bytes = await file.arrayBuffer();
+  const attempted: string[] = [];
+
+  for (const bucket of candidateBuckets()) {
+    const { error: uploadError } = await supabase.storage.from(bucket).upload(path, bytes, {
+      contentType: file.type || undefined,
+      upsert: false,
+      cacheControl: "3600"
+    });
+
+    if (uploadError) {
+      attempted.push(`${bucket}: ${uploadError.message}`);
+      continue;
+    }
+
+    const { data } = supabase.storage.from(bucket).getPublicUrl(path);
+    if (!data.publicUrl) {
+      attempted.push(`${bucket}: public URL unavailable`);
+      continue;
+    }
+
+    return data.publicUrl;
+  }
+
+  throw new Error(`Image upload failed for all candidate buckets. ${attempted.join(" | ")}`);
+}
+
 async function createImage(formData: FormData) {
   "use server";
   const supabase = createClient();
@@ -23,16 +68,7 @@ async function createImage(formData: FormData) {
   let resolvedUrl = url;
 
   if (!resolvedUrl && file && file.size > 0) {
-    const extension = file.name.includes(".") ? file.name.split(".").pop() : "bin";
-    const path = `${Date.now()}-${Math.random().toString(36).slice(2)}.${extension}`;
-    const { error: uploadError } = await supabase.storage.from("images").upload(path, file, {
-      contentType: file.type || undefined
-    });
-
-    if (!uploadError) {
-      const { data } = supabase.storage.from("images").getPublicUrl(path);
-      resolvedUrl = data.publicUrl;
-    }
+    resolvedUrl = await uploadFileAndResolveUrl(file);
   }
 
   if (!resolvedUrl || !userId) return;
@@ -43,12 +79,18 @@ async function createImage(formData: FormData) {
     { src: resolvedUrl, title },
     { path: resolvedUrl, title }
   ];
+
+  let lastError: string | null = null;
   for (const payload of payloads) {
     const { error } = await supabase.from("images").insert(withCreateAuditFields(payload, userId) as any);
-    if (!error) break;
+    if (!error) {
+      revalidatePath("/admin/images");
+      return;
+    }
+    lastError = error.message;
   }
 
-  revalidatePath("/admin/images");
+  throw new Error(`Image row insert failed. ${lastError ?? "Unknown error."}`);
 }
 
 async function updateImage(formData: FormData) {
@@ -62,12 +104,17 @@ async function updateImage(formData: FormData) {
   if (!userId) return;
 
   const payloads = [{ title, url }, { title, image_url: url }, { title, src: url }, { title, path: url }];
+  let lastError: string | null = null;
   for (const payload of payloads) {
     const { error } = await supabase.from("images").update(withUpdateAuditFields(payload, userId) as any).eq("id", id);
-    if (!error) break;
+    if (!error) {
+      revalidatePath("/admin/images");
+      return;
+    }
+    lastError = error.message;
   }
 
-  revalidatePath("/admin/images");
+  throw new Error(`Image update failed. ${lastError ?? "Unknown error."}`);
 }
 
 async function deleteImage(formData: FormData) {
@@ -86,7 +133,10 @@ export default async function ImagesPage() {
     <main className="grid">
       <section className="card">
         <h1>Images CRUD</h1>
-        <p className="form-note">Audit fields are attached automatically when images are created or updated.</p>
+        <p className="form-note">
+          Audit fields are attached automatically when images are created or updated. Upload bucket defaults to
+          `images`, and can be overridden with `SUPABASE_IMAGES_BUCKET`.
+        </p>
         <form action={createImage} className="grid" style={{ gridTemplateColumns: "2fr 2fr 2fr auto" }}>
           <input type="url" name="url" placeholder="https://... (optional if uploading file)" />
           <input name="title" placeholder="image title" />
@@ -100,15 +150,16 @@ export default async function ImagesPage() {
           <thead>
             <tr>
               <th>ID</th>
-              <th>URL</th>
+              <th>Preview</th>
               <th>Title</th>
+              <th>Flavor</th>
               <th>Actions</th>
             </tr>
           </thead>
           <tbody>
             {(images ?? []).length === 0 ? (
               <tr>
-                <td colSpan={4}>No images found.</td>
+                <td colSpan={5}>No images found.</td>
               </tr>
             ) : (
               (images ?? []).map((image: Row) => (
@@ -116,8 +167,8 @@ export default async function ImagesPage() {
                   <td>{image.id}</td>
                   <td>
                     {imageUrl(image) ? (
-                      <a href={imageUrl(image)} target="_blank">
-                        {imageUrl(image)}
+                      <a href={imageUrl(image)} target="_blank" rel="noreferrer">
+                        <img className="image-preview" src={imageUrl(image)} alt={imageTitle(image) || "Uploaded image"} />
                       </a>
                     ) : (
                       "-"
@@ -131,6 +182,7 @@ export default async function ImagesPage() {
                       <button type="submit">Update</button>
                     </form>
                   </td>
+                  <td>{imageFlavor(image)}</td>
                   <td>
                     <form action={deleteImage}>
                       <input type="hidden" name="id" value={image.id} />

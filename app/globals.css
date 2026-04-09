@@ -1,6 +1,6 @@
 :root {
   color-scheme: dark;
-  font-family: "Bookmania", "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+  font-family: "Inter", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
   --gold: #d4af37;
   --gold-soft: #b9972f;
 }
@@ -171,4 +171,14 @@ button:hover {
 .pagination-links a[aria-disabled="true"] {
   pointer-events: none;
   opacity: 0.45;
+}
+
+
+.image-preview {
+  width: 96px;
+  height: 96px;
+  object-fit: cover;
+  border-radius: 10px;
+  border: 1px solid #3f3720;
+  background: #0f121a;
 }
