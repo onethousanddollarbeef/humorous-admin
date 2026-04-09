@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase-server";
 import { getCurrentAuditUserId, withCreateAuditFields, withUpdateAuditFields } from "@/lib/admin-audit";
@@ -107,12 +106,12 @@ export default async function AdminCrudTable({
             Page {safePage} of {totalPages}
           </strong>
           <div className="pagination-links">
-            <Link aria-disabled={safePage <= 1} href={`${path}?page=${Math.max(1, safePage - 1)}`}>
+            <a aria-disabled={safePage <= 1} href={`${path}?page=${Math.max(1, safePage - 1)}`}>
               Previous
-            </Link>
-            <Link aria-disabled={safePage >= totalPages} href={`${path}?page=${Math.min(totalPages, safePage + 1)}`}>
+            </a>
+            <a aria-disabled={safePage >= totalPages} href={`${path}?page=${Math.min(totalPages, safePage + 1)}`}>
               Next
-            </Link>
+            </a>
           </div>
         </div>
 
