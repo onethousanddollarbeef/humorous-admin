@@ -224,3 +224,23 @@ button:hover {
   line-height: 1.45;
   font-size: 0.95rem;
 }
+
+
+.status-banner {
+  margin: 6px 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid #2c2f45;
+}
+
+.status-error {
+  color: #ffd2d2;
+  background: rgba(159, 41, 41, 0.22);
+  border-color: rgba(205, 65, 65, 0.65);
+}
+
+.status-success {
+  color: #d8ffe1;
+  background: rgba(38, 115, 66, 0.26);
+  border-color: rgba(70, 176, 107, 0.6);
+}

@@ -1,8 +1,16 @@
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { getCurrentAuditUserId, withCreateAuditFields, withUpdateAuditFields } from "@/lib/admin-audit";
 import { createClient } from "@/lib/supabase-server";
 
 type Row = Record<string, any>;
+
+type PageProps = {
+  searchParams?: {
+    error?: string;
+    success?: string;
+  };
+};
 
 function imageUrl(row: Row) {
   return row.url ?? row.image_url ?? row.src ?? row.path ?? "";
@@ -23,6 +31,14 @@ function sanitizeFilename(name: string) {
 function candidateBuckets() {
   const configured = process.env.SUPABASE_IMAGES_BUCKET;
   return [...new Set([configured, "images", "image_uploads", "uploads"].filter(Boolean) as string[])];
+}
+
+function imageRouteWithStatus(status: { success?: string; error?: string }) {
+  const query = new URLSearchParams();
+  if (status.success) query.set("success", status.success);
+  if (status.error) query.set("error", status.error);
+  const suffix = query.toString();
+  return suffix ? `/admin/images?${suffix}` : "/admin/images";
 }
 
 async function uploadFileAndResolveUrl(file: File, preferredPathPrefix = "admin") {
@@ -54,80 +70,111 @@ async function uploadFileAndResolveUrl(file: File, preferredPathPrefix = "admin"
     return data.publicUrl;
   }
 
-  throw new Error(`Image upload failed for all candidate buckets. ${attempted.join(" | ")}`);
+  return { error: `Image upload failed for all buckets. ${attempted.join(" | ")}` } as const;
 }
 
 async function createImage(formData: FormData) {
   "use server";
-  const supabase = createClient();
-  const userId = await getCurrentAuditUserId();
-  const url = String(formData.get("url") ?? "").trim();
-  const title = String(formData.get("title") ?? "").trim();
-  const file = formData.get("file") as File | null;
 
-  let resolvedUrl = url;
+  try {
+    const supabase = createClient();
+    const userId = await getCurrentAuditUserId();
+    const url = String(formData.get("url") ?? "").trim();
+    const title = String(formData.get("title") ?? "").trim();
+    const file = formData.get("file") as File | null;
 
-  if (!resolvedUrl && file && file.size > 0) {
-    resolvedUrl = await uploadFileAndResolveUrl(file);
-  }
-
-  if (!resolvedUrl || !userId) return;
-
-  const payloads = [
-    { url: resolvedUrl, title },
-    { image_url: resolvedUrl, title },
-    { src: resolvedUrl, title },
-    { path: resolvedUrl, title }
-  ];
-
-  let lastError: string | null = null;
-  for (const payload of payloads) {
-    const { error } = await supabase.from("images").insert(withCreateAuditFields(payload, userId) as any);
-    if (!error) {
-      revalidatePath("/admin/images");
-      return;
+    if (!userId) {
+      redirect(imageRouteWithStatus({ error: "You must be signed in as superadmin to create images." }));
     }
-    lastError = error.message;
-  }
 
-  throw new Error(`Image row insert failed. ${lastError ?? "Unknown error."}`);
+    let resolvedUrl = url;
+
+    if (!resolvedUrl && file && file.size > 0) {
+      const uploadResult = await uploadFileAndResolveUrl(file);
+      if (typeof uploadResult === "object" && "error" in uploadResult) {
+        redirect(imageRouteWithStatus({ error: uploadResult.error }));
+      }
+      resolvedUrl = uploadResult;
+    }
+
+    if (!resolvedUrl) {
+      redirect(imageRouteWithStatus({ error: "Provide either an image URL or a file to upload." }));
+    }
+
+    const payloads = [
+      { url: resolvedUrl, title },
+      { image_url: resolvedUrl, title },
+      { src: resolvedUrl, title },
+      { path: resolvedUrl, title }
+    ];
+
+    let lastError: string | null = null;
+    for (const payload of payloads) {
+      const { error } = await supabase.from("images").insert(withCreateAuditFields(payload, userId) as any);
+      if (!error) {
+        revalidatePath("/admin/images");
+        redirect(imageRouteWithStatus({ success: "Image created successfully." }));
+      }
+      lastError = error.message;
+    }
+
+    redirect(imageRouteWithStatus({ error: `Image row insert failed. ${lastError ?? "Unknown error."}` }));
+  } catch (error: any) {
+    redirect(imageRouteWithStatus({ error: error?.message ?? "Unexpected server error while creating image." }));
+  }
 }
 
 async function updateImage(formData: FormData) {
   "use server";
-  const supabase = createClient();
-  const userId = await getCurrentAuditUserId();
-  const id = String(formData.get("id"));
-  const title = String(formData.get("title") ?? "").trim();
-  const url = String(formData.get("url") ?? "").trim();
 
-  if (!userId) return;
+  try {
+    const supabase = createClient();
+    const userId = await getCurrentAuditUserId();
+    const id = String(formData.get("id"));
+    const title = String(formData.get("title") ?? "").trim();
+    const url = String(formData.get("url") ?? "").trim();
 
-  const payloads = [{ title, url }, { title, image_url: url }, { title, src: url }, { title, path: url }];
-  let lastError: string | null = null;
-  for (const payload of payloads) {
-    const { error } = await supabase.from("images").update(withUpdateAuditFields(payload, userId) as any).eq("id", id);
-    if (!error) {
-      revalidatePath("/admin/images");
-      return;
+    if (!userId) {
+      redirect(imageRouteWithStatus({ error: "You must be signed in as superadmin to update images." }));
     }
-    lastError = error.message;
-  }
 
-  throw new Error(`Image update failed. ${lastError ?? "Unknown error."}`);
+    const payloads = [{ title, url }, { title, image_url: url }, { title, src: url }, { title, path: url }];
+    let lastError: string | null = null;
+    for (const payload of payloads) {
+      const { error } = await supabase.from("images").update(withUpdateAuditFields(payload, userId) as any).eq("id", id);
+      if (!error) {
+        revalidatePath("/admin/images");
+        redirect(imageRouteWithStatus({ success: "Image updated successfully." }));
+      }
+      lastError = error.message;
+    }
+
+    redirect(imageRouteWithStatus({ error: `Image update failed. ${lastError ?? "Unknown error."}` }));
+  } catch (error: any) {
+    redirect(imageRouteWithStatus({ error: error?.message ?? "Unexpected server error while updating image." }));
+  }
 }
 
 async function deleteImage(formData: FormData) {
   "use server";
-  const supabase = createClient();
-  const id = String(formData.get("id"));
-  await supabase.from("images").delete().eq("id", id);
-  revalidatePath("/admin/images");
+
+  try {
+    const supabase = createClient();
+    const id = String(formData.get("id"));
+    await supabase.from("images").delete().eq("id", id);
+    revalidatePath("/admin/images");
+    redirect(imageRouteWithStatus({ success: "Image deleted successfully." }));
+  } catch (error: any) {
+    redirect(imageRouteWithStatus({ error: error?.message ?? "Unexpected server error while deleting image." }));
+  }
 }
 
-export default async function ImagesPage() {
+export default async function ImagesPage({ searchParams }: PageProps) {
   const supabase = createClient();
   const { data: images } = await supabase.from("images").select("*").limit(100);
+
+  const errorMessage = searchParams?.error ? decodeURIComponent(String(searchParams.error)) : "";
+  const successMessage = searchParams?.success ? decodeURIComponent(String(searchParams.success)) : "";
 
   return (
     <main className="grid">
@@ -137,6 +184,8 @@ export default async function ImagesPage() {
           Audit fields are attached automatically when images are created or updated. Upload bucket defaults to
           `images`, and can be overridden with `SUPABASE_IMAGES_BUCKET`.
         </p>
+        {errorMessage ? <p className="status-banner status-error">{errorMessage}</p> : null}
+        {successMessage ? <p className="status-banner status-success">{successMessage}</p> : null}
         <form action={createImage} className="grid" style={{ gridTemplateColumns: "2fr 2fr 2fr auto" }}>
           <input type="url" name="url" placeholder="https://... (optional if uploading file)" />
           <input name="title" placeholder="image title" />
