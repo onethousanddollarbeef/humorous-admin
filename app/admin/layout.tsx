@@ -69,7 +69,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         <div className="admin-nav-groups">
           {navSections.map((section) => (
             <section key={section.title}>
-              <h3>{section.title}</h3>
+              <h3 className="nav-group-title">{section.title}</h3>
               <div className="links">
                 {section.links.map(([label, href]) => (
                   <Link key={href} href={href}>
