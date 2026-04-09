@@ -209,3 +209,18 @@ button:hover {
   border-radius: 12px;
   border: 1px solid #2c2f45;
 }
+
+
+.image-title {
+  margin: 10px 0 0;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: #f0f3ff;
+}
+
+.image-description {
+  margin: 8px 0 0;
+  color: #b7bfd4;
+  line-height: 1.45;
+  font-size: 0.95rem;
+}

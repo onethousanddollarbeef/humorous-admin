@@ -2,25 +2,32 @@ import { createClient } from "@/lib/supabase-server";
 
 type Row = Record<string, any>;
 
-function pickDate(row: Row) {
-  const value = row.created_at ?? row.created_datetime_utc ?? row.inserted_at ?? row.updated_at;
-  return value ? new Date(value).toLocaleString() : "-";
-}
-
-function pickOwner(row: Row) {
-  return row.user_id ?? row.profile_id ?? row.owner_id ?? "-";
-}
-
 function pickImageUrl(row: Row) {
   return row.url ?? row.image_url ?? row.src ?? row.path ?? "";
 }
 
-function pickTitle(row: Row) {
-  return row.title ?? row.name ?? row.caption ?? "Untitled image";
+function normalizeText(value: unknown) {
+  return String(value ?? "").trim();
 }
 
-function pickFlavor(row: Row) {
-  return row.humor_flavor_name ?? row.humor_flavor_id ?? row.flavor_name ?? row.flavor_id ?? "Unassigned";
+function pickCaptionText(row: Row) {
+  return (
+    normalizeText(row.generated_caption) ||
+    normalizeText(row.body) ||
+    normalizeText(row.content) ||
+    normalizeText(row.caption) ||
+    normalizeText(row.description) ||
+    normalizeText(row.text)
+  );
+}
+
+function pickImageTitle(row: Row, generatedCaption: string) {
+  return normalizeText(row.title) || normalizeText(row.name) || generatedCaption || "No generated caption yet";
+}
+
+function ellipsize(text: string, max = 120) {
+  if (text.length <= max) return text;
+  return `${text.slice(0, max - 1)}…`;
 }
 
 export default async function DashboardPage() {
@@ -34,7 +41,9 @@ export default async function DashboardPage() {
     { count: terms },
     { count: models },
     { count: domains },
-    { data: recentImages }
+    { data: recentImages },
+    { data: flavors },
+    { data: captionRows }
   ] = await Promise.all([
     supabase.from("profiles").select("id", { count: "exact", head: true }),
     supabase.from("images").select("id", { count: "exact", head: true }),
@@ -43,7 +52,9 @@ export default async function DashboardPage() {
     supabase.from("terms").select("id", { count: "exact", head: true }),
     supabase.from("llm_models").select("id", { count: "exact", head: true }),
     supabase.from("allowed_signup_domains").select("id", { count: "exact", head: true }),
-    supabase.from("images").select("*").limit(12)
+    supabase.from("images").select("*").limit(24),
+    supabase.from("humor_flavors").select("*"),
+    supabase.from("captions").select("*").limit(400)
   ]);
 
   const sortedRecent = [...(recentImages ?? [])].sort((a: Row, b: Row) => {
@@ -51,6 +62,26 @@ export default async function DashboardPage() {
     const tb = new Date(b.created_at ?? b.created_datetime_utc ?? 0).getTime();
     return tb - ta;
   });
+
+  const flavorById = new Map<string, string>();
+  for (const flavor of flavors ?? []) {
+    const id = normalizeText((flavor as Row).id);
+    const name =
+      normalizeText((flavor as Row).name) ||
+      normalizeText((flavor as Row).flavor_name) ||
+      normalizeText((flavor as Row).title);
+    if (id && name) flavorById.set(id, name);
+  }
+
+  const captionByImageId = new Map<string, string>();
+  for (const caption of captionRows ?? []) {
+    const row = caption as Row;
+    const imageId = normalizeText(row.image_id ?? row.source_image_id ?? row.parent_image_id);
+    const text = pickCaptionText(row);
+    if (imageId && text && !captionByImageId.has(imageId)) {
+      captionByImageId.set(imageId, text);
+    }
+  }
 
   const burstiness = (sortedRecent.length ?? 0) >= 5 ? "🔥 Meme storm" : "🌱 Slow drip";
 
@@ -94,45 +125,30 @@ export default async function DashboardPage() {
         </div>
       </section>
 
-      <section className="card">
-        <h3>Latest Image Uploads</h3>
-        <table className="table">
-          <thead>
-            <tr>
-              <th>Image ID</th>
-              <th>Owner ID</th>
-              <th>Created</th>
-            </tr>
-          </thead>
-          <tbody>
-            {sortedRecent.length === 0 ? (
-              <tr>
-                <td colSpan={3}>No images found.</td>
-              </tr>
-            ) : (
-              sortedRecent.map((item: Row) => (
-                <tr key={item.id}>
-                  <td>{item.id}</td>
-                  <td>{pickOwner(item)}</td>
-                  <td>{pickDate(item)}</td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </section>
-
       <section className="grid image-gallery">
         {sortedRecent
           .filter((item: Row) => pickImageUrl(item))
-          .slice(0, 6)
-          .map((item: Row) => (
-            <article className="card" key={`preview-${item.id}`}>
-              <h3>{pickFlavor(item)}</h3>
-              <img className="hero-image" src={pickImageUrl(item)} alt={pickTitle(item)} />
-              <p style={{ margin: "8px 0 0" }}>{pickTitle(item)}</p>
-            </article>
-          ))}
+          .slice(0, 12)
+          .map((item: Row) => {
+            const imageId = normalizeText(item.id);
+            const generatedCaption = imageId ? captionByImageId.get(imageId) ?? "" : "";
+            const flavorName =
+              normalizeText(item.humor_flavor_name) ||
+              normalizeText(item.flavor_name) ||
+              flavorById.get(normalizeText(item.humor_flavor_id ?? item.flavor_id)) ||
+              "Flavor not set";
+            const title = pickImageTitle(item, generatedCaption);
+            const description = generatedCaption || normalizeText(item.description) || "No generated description yet";
+
+            return (
+              <article className="card" key={`preview-${item.id}`}>
+                <h3>{flavorName}</h3>
+                <img className="hero-image" src={pickImageUrl(item)} alt={title} />
+                <p className="image-title">{ellipsize(title, 88)}</p>
+                <p className="image-description">{ellipsize(description, 180)}</p>
+              </article>
+            );
+          })}
       </section>
     </main>
   );
