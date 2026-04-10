@@ -9,36 +9,35 @@ async function signOut() {
   redirect("/login");
 }
 
-const navSections = [
+const menuGroups = [
+  { label: "Users", href: "/admin/users" },
+  { label: "Images", href: "/admin/images" },
   {
-    title: "Overview",
-    links: [["Dashboard", "/admin"]] as const
-  },
-  {
-    title: "Content",
-    links: [
-      ["Users", "/admin/users"],
-      ["Images", "/admin/images"],
+    label: "Captions",
+    items: [
       ["Captions", "/admin/captions"],
       ["Caption Requests", "/admin/caption-requests"],
-      ["Caption Examples", "/admin/caption-examples"],
-      ["Example Captions", "/admin/example-captions"]
+      ["Caption Examples", "/admin/caption-examples"]
     ] as const
   },
   {
-    title: "Config",
-    links: [
+    label: "Flavors",
+    items: [
       ["Humor Flavors", "/admin/humor-flavors"],
       ["Flavor Steps", "/admin/humor-flavor-steps"],
-      ["Humor Mix", "/admin/humor-mix"],
-      ["Terms", "/admin/terms"],
+      ["Humor Mix", "/admin/humor-mix"]
+    ] as const
+  },
+  {
+    label: "Logistics",
+    items: [
       ["Allowed Domains", "/admin/allowed-signup-domains"],
       ["Whitelisted Emails", "/admin/whitelisted-email-addresses"]
     ] as const
   },
   {
-    title: "LLMs",
-    links: [
+    label: "LLMs",
+    items: [
       ["LLM Models", "/admin/llm-models"],
       ["LLM Providers", "/admin/llm-providers"],
       ["Prompt Chains", "/admin/llm-prompt-chains"],
@@ -62,28 +61,40 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   }
 
   return (
-    <div className="container admin-shell">
-      <aside className="admin-sidebar card" aria-label="Admin navigation sidebar">
-        <h2>Humorous Admin</h2>
-        <p className="admin-sidebar-subtitle">Choose a section to manage data quickly.</p>
-        <div className="admin-nav-groups">
-          {navSections.map((section) => (
-            <section key={section.title}>
-              <h3 className="nav-group-title">{section.title}</h3>
-              <div className="links">
-                {section.links.map(([label, href]) => (
-                  <Link key={href} href={href}>
-                    {label}
-                  </Link>
-                ))}
+    <div className="container admin-top-shell">
+      <header className="topbar card">
+        <Link className="brand" href="/admin">
+          Humorous Admin
+        </Link>
+
+        <nav className="topbar-nav" aria-label="Admin navigation">
+          {menuGroups.map((group) =>
+            "href" in group ? (
+              <Link key={group.label} href={group.href} className="topbar-link">
+                {group.label}
+              </Link>
+            ) : (
+              <div key={group.label} className="topbar-dropdown">
+                <button type="button" className="topbar-link">
+                  {group.label}
+                </button>
+                <div className="topbar-dropdown-menu">
+                  {group.items.map(([label, href]) => (
+                    <Link key={href} href={href}>
+                      {label}
+                    </Link>
+                  ))}
+                </div>
               </div>
-            </section>
-          ))}
-        </div>
+            )
+          )}
+        </nav>
+
         <form action={signOut}>
           <button type="submit">Sign out</button>
         </form>
-      </aside>
+      </header>
+
       <div className="admin-content">{children}</div>
     </div>
   );
