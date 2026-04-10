@@ -120,6 +120,8 @@ async function createImage(formData: FormData) {
 
     redirect(imageRouteWithStatus({ error: `Image row insert failed. ${lastError ?? "Unknown error."}` }));
   } catch (error: any) {
+    const signature = String(error?.digest ?? error?.message ?? "");
+    if (signature.includes("NEXT_REDIRECT")) throw error;
     redirect(imageRouteWithStatus({ error: error?.message ?? "Unexpected server error while creating image." }));
   }
 }
@@ -151,6 +153,8 @@ async function updateImage(formData: FormData) {
 
     redirect(imageRouteWithStatus({ error: `Image update failed. ${lastError ?? "Unknown error."}` }));
   } catch (error: any) {
+    const signature = String(error?.digest ?? error?.message ?? "");
+    if (signature.includes("NEXT_REDIRECT")) throw error;
     redirect(imageRouteWithStatus({ error: error?.message ?? "Unexpected server error while updating image." }));
   }
 }
@@ -165,6 +169,8 @@ async function deleteImage(formData: FormData) {
     revalidatePath("/admin/images");
     redirect(imageRouteWithStatus({ success: "Image deleted successfully." }));
   } catch (error: any) {
+    const signature = String(error?.digest ?? error?.message ?? "");
+    if (signature.includes("NEXT_REDIRECT")) throw error;
     redirect(imageRouteWithStatus({ error: error?.message ?? "Unexpected server error while deleting image." }));
   }
 }
