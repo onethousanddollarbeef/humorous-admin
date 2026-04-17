@@ -68,7 +68,10 @@ export default async function DashboardPage() {
     { data: flavorRows },
     { data: imageRows },
     { data: captionRows },
-    { data: flavorMixRows }
+    { data: flavorMixRows },
+    captionScoresQuery,
+    captionVotesQuery,
+    captionRatingsQuery
   ] = await Promise.all([
     supabase.from("profiles").select("id", { count: "exact", head: true }),
     supabase.from("images").select("id", { count: "exact", head: true }),
@@ -80,11 +83,21 @@ export default async function DashboardPage() {
     supabase.from("humor_flavors").select("*").limit(50),
     supabase.from("images").select("*").limit(500),
     supabase.from("captions").select("*").limit(500),
-    supabase.from("humor_flavor_mix").select("*").limit(500)
+    supabase.from("humor_flavor_mix").select("*").limit(500),
+    supabase.from("caption_scores").select("*").limit(5000),
+    supabase.from("caption_votes").select("*").limit(5000),
+    supabase.from("caption_ratings").select("*").limit(5000)
   ]);
 
   const flavors = (flavorRows ?? []) as Row[];
   const captionData = (captionRows ?? []) as Row[];
+  const ratingRows = !captionScoresQuery?.error
+    ? ((captionScoresQuery?.data ?? []) as Row[])
+    : !captionVotesQuery?.error
+      ? ((captionVotesQuery?.data ?? []) as Row[])
+      : !captionRatingsQuery?.error
+        ? ((captionRatingsQuery?.data ?? []) as Row[])
+        : [];
   const imagesByFlavor = new Map<string, Row>();
   const imagesById = new Map<string, Row>();
   const imageCounts = new Map<string, number>();
@@ -124,34 +137,97 @@ export default async function DashboardPage() {
   let totalRatings = 0;
   let weightedScoreSum = 0;
 
-  const topRatedCaptions = [...captionData]
-    .map((row) => {
-      const upvotes = toNumber(row.upvotes ?? row.likes ?? row.positive_votes);
-      const downvotes = toNumber(row.downvotes ?? row.dislikes ?? row.negative_votes);
-      const votes = toNumber(row.vote_count ?? row.rating_count ?? upvotes + downvotes);
-      const score = toNumber(row.avg_vote ?? row.average_vote ?? row.score ?? row.rating);
-      const resolvedVotes = votes || upvotes + downvotes;
+  const captionTextById = new Map<string, string>();
+  for (const caption of captionData) {
+    const captionId = normalizeText(caption.id);
+    if (captionId) captionTextById.set(captionId, pickCaptionBody(caption));
+  }
 
-      totalUpvotes += upvotes;
-      totalDownvotes += downvotes;
-      totalRatings += resolvedVotes;
-      weightedScoreSum += score * Math.max(1, resolvedVotes);
+  const voteByCaptionId = new Map<string, { upvotes: number; downvotes: number; votes: number; scoreSum: number }>();
+
+  for (const rating of ratingRows) {
+    const captionId = normalizeText(
+      rating.caption_id ?? rating.target_caption_id ?? rating.captions_id ?? rating.caption_example_id
+    );
+    if (!captionId) continue;
+    const existing = voteByCaptionId.get(captionId) ?? { upvotes: 0, downvotes: 0, votes: 0, scoreSum: 0 };
+    const vote = toNumber(
+      rating.vote ??
+        rating.score ??
+        rating.rating ??
+        rating.score_value ??
+        rating.value ??
+        (rating.is_upvote === true ? 1 : rating.is_upvote === false ? -1 : 0)
+    );
+
+    if (vote > 0) existing.upvotes += 1;
+    else if (vote < 0) existing.downvotes += 1;
+
+    if (vote !== 0) {
+      existing.votes += 1;
+      existing.scoreSum += vote;
+    }
+
+    voteByCaptionId.set(captionId, existing);
+  }
+
+  // If caption_scores/votes exists, build top list directly from rating rows.
+  let topRatedCaptions = Array.from(voteByCaptionId.entries())
+    .map(([captionId, agg]) => {
+      const score = agg.votes > 0 ? agg.scoreSum / agg.votes : 0;
+      const text = captionTextById.get(captionId) ?? `Caption ID: ${captionId}`;
+
+      totalUpvotes += agg.upvotes;
+      totalDownvotes += agg.downvotes;
+      totalRatings += agg.votes;
+      weightedScoreSum += score * Math.max(1, agg.votes);
 
       return {
-        id: normalizeText(row.id),
-        text: pickCaptionBody(row),
+        id: captionId,
+        text,
         score,
-        votes: resolvedVotes,
-        upvotes,
-        downvotes
+        votes: agg.votes,
+        upvotes: agg.upvotes,
+        downvotes: agg.downvotes
       };
     })
-    .filter((row) => row.votes > 0 || row.score !== 0)
     .sort((a, b) => {
       if (b.score !== a.score) return b.score - a.score;
       return b.votes - a.votes;
     })
     .slice(0, 8);
+
+  // Fallback path when rating rows are missing: use denormalized caption columns.
+  if (topRatedCaptions.length === 0) {
+    topRatedCaptions = [...captionData]
+      .map((row) => {
+        const upvotes = toNumber(row.upvotes ?? row.likes ?? row.positive_votes);
+        const downvotes = toNumber(row.downvotes ?? row.dislikes ?? row.negative_votes);
+        const votes = toNumber(row.vote_count ?? row.rating_count ?? upvotes + downvotes);
+        const score = toNumber(row.avg_vote ?? row.average_vote ?? row.score ?? row.rating);
+        const resolvedVotes = votes || upvotes + downvotes;
+
+        totalUpvotes += upvotes;
+        totalDownvotes += downvotes;
+        totalRatings += resolvedVotes;
+        weightedScoreSum += score * Math.max(1, resolvedVotes);
+
+        return {
+          id: normalizeText(row.id),
+          text: pickCaptionBody(row),
+          score,
+          votes: resolvedVotes,
+          upvotes,
+          downvotes
+        };
+      })
+      .filter((row) => row.votes > 0 || row.score !== 0)
+      .sort((a, b) => {
+        if (b.score !== a.score) return b.score - a.score;
+        return b.votes - a.votes;
+      })
+      .slice(0, 8);
+  }
 
   const netVotes = totalUpvotes - totalDownvotes;
   const weightedAvgScore = totalRatings > 0 ? weightedScoreSum / totalRatings : 0;
