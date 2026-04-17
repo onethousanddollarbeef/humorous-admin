@@ -68,7 +68,8 @@ export default async function DashboardPage() {
     { data: flavorRows },
     { data: imageRows },
     { data: captionRows },
-    { data: flavorMixRows }
+    { data: flavorMixRows },
+    ratingsQuery
   ] = await Promise.all([
     supabase.from("profiles").select("id", { count: "exact", head: true }),
     supabase.from("images").select("id", { count: "exact", head: true }),
@@ -80,11 +81,13 @@ export default async function DashboardPage() {
     supabase.from("humor_flavors").select("*").limit(50),
     supabase.from("images").select("*").limit(500),
     supabase.from("captions").select("*").limit(500),
-    supabase.from("humor_flavor_mix").select("*").limit(500)
+    supabase.from("humor_flavor_mix").select("*").limit(500),
+    supabase.from("caption_ratings").select("*").limit(5000)
   ]);
 
   const flavors = (flavorRows ?? []) as Row[];
   const captionData = (captionRows ?? []) as Row[];
+  const ratingRows = !ratingsQuery?.error ? ((ratingsQuery?.data ?? []) as Row[]) : [];
   const imagesByFlavor = new Map<string, Row>();
   const imagesById = new Map<string, Row>();
   const imageCounts = new Map<string, number>();
@@ -124,12 +127,43 @@ export default async function DashboardPage() {
   let totalRatings = 0;
   let weightedScoreSum = 0;
 
+  const voteByCaptionId = new Map<string, { upvotes: number; downvotes: number; votes: number; scoreSum: number }>();
+
+  for (const rating of ratingRows) {
+    const captionId = normalizeText(rating.caption_id ?? rating.target_caption_id);
+    if (!captionId) continue;
+    const existing = voteByCaptionId.get(captionId) ?? { upvotes: 0, downvotes: 0, votes: 0, scoreSum: 0 };
+    const vote = toNumber(rating.vote ?? rating.score ?? rating.rating);
+
+    if (vote > 0) existing.upvotes += 1;
+    else if (vote < 0) existing.downvotes += 1;
+
+    if (vote !== 0) {
+      existing.votes += 1;
+      existing.scoreSum += vote;
+    }
+
+    voteByCaptionId.set(captionId, existing);
+  }
+
   const topRatedCaptions = [...captionData]
     .map((row) => {
-      const upvotes = toNumber(row.upvotes ?? row.likes ?? row.positive_votes);
-      const downvotes = toNumber(row.downvotes ?? row.dislikes ?? row.negative_votes);
-      const votes = toNumber(row.vote_count ?? row.rating_count ?? upvotes + downvotes);
-      const score = toNumber(row.avg_vote ?? row.average_vote ?? row.score ?? row.rating);
+      const captionId = normalizeText(row.id);
+      const fromRatings = voteByCaptionId.get(captionId);
+
+      const upvotes =
+        fromRatings?.upvotes ??
+        toNumber(row.upvotes ?? row.likes ?? row.positive_votes);
+      const downvotes =
+        fromRatings?.downvotes ??
+        toNumber(row.downvotes ?? row.dislikes ?? row.negative_votes);
+      const votes =
+        fromRatings?.votes ??
+        toNumber(row.vote_count ?? row.rating_count ?? upvotes + downvotes);
+      const score =
+        fromRatings && fromRatings.votes > 0
+          ? fromRatings.scoreSum / fromRatings.votes
+          : toNumber(row.avg_vote ?? row.average_vote ?? row.score ?? row.rating);
       const resolvedVotes = votes || upvotes + downvotes;
 
       totalUpvotes += upvotes;
@@ -138,7 +172,7 @@ export default async function DashboardPage() {
       weightedScoreSum += score * Math.max(1, resolvedVotes);
 
       return {
-        id: normalizeText(row.id),
+        id: captionId,
         text: pickCaptionBody(row),
         score,
         votes: resolvedVotes,
