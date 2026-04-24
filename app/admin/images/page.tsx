@@ -135,12 +135,23 @@ async function updateImage(formData: FormData) {
     const id = String(formData.get("id"));
     const title = String(formData.get("title") ?? "").trim();
     const url = String(formData.get("url") ?? "").trim();
+    const file = formData.get("file") as File | null;
 
     if (!userId) {
       redirect(imageRouteWithStatus({ error: "You must be signed in as superadmin to update images." }));
     }
 
-    const payloads = [{ title, url }, { title, image_url: url }, { title, src: url }, { title, path: url }];
+    let resolvedUrl = url;
+
+    if (!resolvedUrl && file && file.size > 0) {
+      const uploadResult = await uploadFileAndResolveUrl(file, "admin/updates");
+      if (typeof uploadResult === "object" && "error" in uploadResult) {
+        redirect(imageRouteWithStatus({ error: uploadResult.error }));
+      }
+      resolvedUrl = uploadResult;
+    }
+
+    const payloads = [{ title, url: resolvedUrl }, { title, image_url: resolvedUrl }, { title, src: resolvedUrl }, { title, path: resolvedUrl }];
     let lastError: string | null = null;
     for (const payload of payloads) {
       const { error } = await supabase.from("images").update(withUpdateAuditFields(payload, userId) as any).eq("id", id);
@@ -190,9 +201,12 @@ export default async function ImagesPage({ searchParams }: PageProps) {
           Audit fields are attached automatically when images are created or updated. Upload bucket defaults to
           `images`, and can be overridden with `SUPABASE_IMAGES_BUCKET`.
         </p>
+        <p className="form-note">
+          Update flow: edit title and URL inline, or upload a replacement file while leaving URL blank.
+        </p>
         {errorMessage ? <p className="status-banner status-error">{errorMessage}</p> : null}
         {successMessage ? <p className="status-banner status-success">{successMessage}</p> : null}
-        <form action={createImage} className="grid" style={{ gridTemplateColumns: "2fr 2fr 2fr auto" }}>
+        <form action={createImage} className="input-row">
           <input type="url" name="url" placeholder="https://... (optional if uploading file)" />
           <input name="title" placeholder="image title" />
           <input type="file" name="file" accept="image/*" />
@@ -201,54 +215,57 @@ export default async function ImagesPage({ searchParams }: PageProps) {
       </section>
 
       <section className="card">
-        <table className="table">
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>Preview</th>
-              <th>Title</th>
-              <th>Flavor</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {(images ?? []).length === 0 ? (
+        <div className="table-wrap">
+          <table className="table">
+            <thead>
               <tr>
-                <td colSpan={5}>No images found.</td>
+                <th>ID</th>
+                <th>Preview</th>
+                <th>Edit Image</th>
+                <th>Flavor</th>
+                <th>Actions</th>
               </tr>
-            ) : (
-              (images ?? []).map((image: Row) => (
-                <tr key={image.id}>
-                  <td>{image.id}</td>
-                  <td>
-                    {imageUrl(image) ? (
-                      <a href={imageUrl(image)} target="_blank" rel="noreferrer">
-                        <img className="image-preview" src={imageUrl(image)} alt={imageTitle(image) || "Uploaded image"} />
-                      </a>
-                    ) : (
-                      "-"
-                    )}
-                  </td>
-                  <td>
-                    <form action={updateImage} style={{ display: "flex", gap: 8 }}>
-                      <input type="hidden" name="id" value={image.id} />
-                      <input name="title" defaultValue={imageTitle(image)} />
-                      <input name="url" defaultValue={imageUrl(image)} />
-                      <button type="submit">Update</button>
-                    </form>
-                  </td>
-                  <td>{imageFlavor(image)}</td>
-                  <td>
-                    <form action={deleteImage}>
-                      <input type="hidden" name="id" value={image.id} />
-                      <button type="submit">Delete</button>
-                    </form>
-                  </td>
+            </thead>
+            <tbody>
+              {(images ?? []).length === 0 ? (
+                <tr>
+                  <td colSpan={5}>No images found.</td>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+              ) : (
+                (images ?? []).map((image: Row) => (
+                  <tr key={image.id}>
+                    <td>{image.id}</td>
+                    <td>
+                      {imageUrl(image) ? (
+                        <a href={imageUrl(image)} target="_blank" rel="noreferrer">
+                          <img className="image-preview" src={imageUrl(image)} alt={imageTitle(image) || "Uploaded image"} />
+                        </a>
+                      ) : (
+                        "-"
+                      )}
+                    </td>
+                    <td style={{ minWidth: 360 }}>
+                      <form action={updateImage} className="inline-edit-form">
+                        <input type="hidden" name="id" value={image.id} />
+                        <input name="title" defaultValue={imageTitle(image)} placeholder="Image title" />
+                        <input name="url" defaultValue={imageUrl(image)} placeholder="Image URL (or leave blank and upload file)" />
+                        <input type="file" name="file" accept="image/*" />
+                        <button type="submit">Save Changes</button>
+                      </form>
+                    </td>
+                    <td>{imageFlavor(image)}</td>
+                    <td>
+                      <form action={deleteImage} className="inline-edit-actions">
+                        <input type="hidden" name="id" value={image.id} />
+                        <button type="submit">Delete</button>
+                      </form>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
       </section>
     </main>
   );

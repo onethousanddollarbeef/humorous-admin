@@ -85,6 +85,7 @@ export default async function AdminCrudTable({
         <h1>{title}</h1>
         {error ? <p style={{ color: "#ff8d8d" }}>Unable to load `{table}`: {error.message}</p> : null}
         <p className="form-note">Audit fields are attached automatically on create and update.</p>
+        <p className="form-note">Tip: this page accepts JSON payloads mapped directly to table columns.</p>
 
         {canCreate ? (
           <form action={createRow} className="grid">
@@ -115,60 +116,62 @@ export default async function AdminCrudTable({
           </div>
         </div>
 
-        <table className="table">
-          <thead>
-            <tr>
-              {columns.map((column) => (
-                <th key={column}>{column}</th>
-              ))}
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.length === 0 ? (
+        <div className="table-wrap">
+          <table className="table">
+            <thead>
               <tr>
-                <td colSpan={columns.length + 1}>No rows found.</td>
+                {columns.map((column) => (
+                  <th key={column}>{column}</th>
+                ))}
+                <th>Actions</th>
               </tr>
-            ) : (
-              rows.map((row, index) => {
-                const id = String(row[primaryKey] ?? "");
-                return (
-                  <tr key={id || String(index)}>
-                    {columns.map((column) => (
-                      <td key={`${id || index}-${column}`}>{displayValue(row[column])}</td>
-                    ))}
-                    <td style={{ minWidth: 280 }}>
-                      {id ? (
-                        <>
-                          <form action={updateRow} className="grid" style={{ marginBottom: 12 }}>
-                            <input type="hidden" name="id" value={id} />
-                            <textarea
-                              name="payload"
-                              rows={6}
-                              defaultValue={JSON.stringify(row, null, 2)}
-                              style={{ width: "100%" }}
-                            />
-                            <button type="submit">Update</button>
-                          </form>
-                          {canDelete ? (
-                            <form action={deleteRow}>
+            </thead>
+            <tbody>
+              {rows.length === 0 ? (
+                <tr>
+                  <td colSpan={columns.length + 1}>No rows found.</td>
+                </tr>
+              ) : (
+                rows.map((row, index) => {
+                  const id = String(row[primaryKey] ?? "");
+                  return (
+                    <tr key={id || String(index)}>
+                      {columns.map((column) => (
+                        <td key={`${id || index}-${column}`}>{displayValue(row[column])}</td>
+                      ))}
+                      <td style={{ minWidth: 280 }}>
+                        {id ? (
+                          <>
+                            <form action={updateRow} className="grid" style={{ marginBottom: 12 }}>
                               <input type="hidden" name="id" value={id} />
-                              <button type="submit">Delete</button>
+                              <textarea
+                                name="payload"
+                                rows={6}
+                                defaultValue={JSON.stringify(row, null, 2)}
+                                style={{ width: "100%" }}
+                              />
+                              <button type="submit">Update</button>
                             </form>
-                          ) : null}
-                        </>
-                      ) : (
-                        <p style={{ margin: 0, color: "#cdc6ad" }}>
-                          No `{primaryKey}` value for this row; update/delete disabled.
-                        </p>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })
-            )}
-          </tbody>
-        </table>
+                            {canDelete ? (
+                              <form action={deleteRow}>
+                                <input type="hidden" name="id" value={id} />
+                                <button type="submit">Delete</button>
+                              </form>
+                            ) : null}
+                          </>
+                        ) : (
+                          <p style={{ margin: 0, color: "#cdc6ad" }}>
+                            No `{primaryKey}` value for this row; update/delete disabled.
+                          </p>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
       </section>
     </main>
   );
