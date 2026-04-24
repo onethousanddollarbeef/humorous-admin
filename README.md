@@ -15,7 +15,8 @@ A Next.js admin app for Supabase data with strict superadmin access.
 
 1. `middleware.ts` blocks unauthenticated access to `/admin/*`.
 2. `app/admin/layout.tsx` enforces superadmin check server-side before any admin page renders.
-3. No RLS policies are modified by this project.
+3. Admin image mutations use the Supabase service-role client, but only after verifying the current user is a superadmin.
+4. No RLS policies are modified by this project.
 
 ## Setup
 
@@ -30,6 +31,7 @@ A Next.js admin app for Supabase data with strict superadmin access.
 3. Add Supabase project values:
    - `NEXT_PUBLIC_SUPABASE_URL`
    - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+   - `SUPABASE_SERVICE_ROLE_KEY` (required for superadmin image create/update/delete writes when RLS is enabled)
 4. Ensure Google provider is enabled in Supabase auth settings.
 5. Run:
    ```bash

@@ -94,6 +94,7 @@ a {
 .table {
   width: 100%;
   border-collapse: collapse;
+  table-layout: fixed;
 }
 
 .table th,
@@ -101,6 +102,9 @@ a {
   text-align: left;
   border-bottom: 1px solid #2f2a1b;
   padding: 10px 8px;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .table th {
@@ -256,6 +260,7 @@ button:hover {
   align-items: center;
   gap: 14px;
   justify-content: space-between;
+  flex-wrap: wrap;
   position: sticky;
   top: 10px;
   z-index: 30;
@@ -273,6 +278,7 @@ button:hover {
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
+  flex: 1 1 520px;
 }
 
 .topbar-link {
@@ -388,4 +394,30 @@ button:hover {
 .compact-table td,
 .compact-table th {
   padding: 8px 6px;
+}
+
+.table-wrap {
+  width: 100%;
+  overflow: hidden;
+}
+
+.table-wrap .table {
+  min-width: 0;
+}
+
+.input-row {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.inline-edit-form {
+  display: grid;
+  gap: 8px;
+}
+
+.inline-edit-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
 }
