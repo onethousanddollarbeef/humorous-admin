@@ -21,34 +21,36 @@ export default async function UsersPage() {
   return (
     <main className="card">
       <h1>Users / Profiles (Read Only)</h1>
-      <table className="table">
-        <thead>
-          <tr>
-            <th>ID</th>
-            <th>Name</th>
-            <th>Email</th>
-            <th>Superadmin</th>
-            <th>Created</th>
-          </tr>
-        </thead>
-        <tbody>
-          {(users ?? []).length === 0 ? (
+      <div className="table-wrap">
+        <table className="table">
+          <thead>
             <tr>
-              <td colSpan={5}>No profiles found.</td>
+              <th>ID</th>
+              <th>Name</th>
+              <th>Email</th>
+              <th>Superadmin</th>
+              <th>Created</th>
             </tr>
-          ) : (
-            (users ?? []).map((user: Row) => (
-              <tr key={user.id}>
-                <td>{user.id}</td>
-                <td>{fullName(user)}</td>
-                <td>{user.email ?? "-"}</td>
-                <td>{user.is_superadmin ? "TRUE" : "FALSE"}</td>
-                <td>{createdAt(user)}</td>
+          </thead>
+          <tbody>
+            {(users ?? []).length === 0 ? (
+              <tr>
+                <td colSpan={5}>No profiles found.</td>
               </tr>
-            ))
-          )}
-        </tbody>
-      </table>
+            ) : (
+              (users ?? []).map((user: Row) => (
+                <tr key={user.id}>
+                  <td>{user.id}</td>
+                  <td>{fullName(user)}</td>
+                  <td>{user.email ?? "-"}</td>
+                  <td>{user.is_superadmin ? "TRUE" : "FALSE"}</td>
+                  <td>{createdAt(user)}</td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
     </main>
   );
 }
