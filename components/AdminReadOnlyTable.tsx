@@ -32,6 +32,7 @@ export default async function AdminReadOnlyTable({ title, table, path, page = 1,
     <main className="card">
       <h1>{title}</h1>
       {error ? <p style={{ color: "#ff8d8d" }}>Unable to load `{table}`: {error.message}</p> : null}
+      <p className="form-note">Read-only table view with pagination. Scroll horizontally for wide schemas.</p>
 
       <div className="table-controls">
         <strong>
@@ -47,30 +48,32 @@ export default async function AdminReadOnlyTable({ title, table, path, page = 1,
         </div>
       </div>
 
-      <table className="table">
-        <thead>
-          <tr>
-            {columns.map((column) => (
-              <th key={column}>{column}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.length === 0 ? (
+      <div className="table-wrap">
+        <table className="table">
+          <thead>
             <tr>
-              <td colSpan={Math.max(columns.length, 1)}>No rows found.</td>
+              {columns.map((column) => (
+                <th key={column}>{column}</th>
+              ))}
             </tr>
-          ) : (
-            rows.map((row: Record<string, unknown>, index: number) => (
-              <tr key={String((row.id as string | undefined) ?? index)}>
-                {columns.map((column) => (
-                  <td key={`${String((row.id as string | undefined) ?? index)}-${column}`}>{displayValue(row[column])}</td>
-                ))}
+          </thead>
+          <tbody>
+            {rows.length === 0 ? (
+              <tr>
+                <td colSpan={Math.max(columns.length, 1)}>No rows found.</td>
               </tr>
-            ))
-          )}
-        </tbody>
-      </table>
+            ) : (
+              rows.map((row: Record<string, unknown>, index: number) => (
+                <tr key={String((row.id as string | undefined) ?? index)}>
+                  {columns.map((column) => (
+                    <td key={`${String((row.id as string | undefined) ?? index)}-${column}`}>{displayValue(row[column])}</td>
+                  ))}
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
     </main>
   );
 }
