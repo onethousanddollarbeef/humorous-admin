@@ -17,7 +17,7 @@ export default function LoginClient({ error }: { error?: string }) {
     <main className="container">
       <div className="card" style={{ maxWidth: 460, margin: "96px auto" }}>
         <h1>Humor Admin Login</h1>
-        <p>Access is limited to users where profiles.is_superadmin = TRUE.</p>
+        <p>Access is limited to superadmin.</p>
         {error === "not_superadmin" ? (
           <p style={{ color: "#ff8d8d" }}>You are authenticated but not a superadmin.</p>
         ) : null}
