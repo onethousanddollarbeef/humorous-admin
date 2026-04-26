@@ -18,32 +18,34 @@ export default async function CaptionsPage() {
   return (
     <main className="card">
       <h1>Captions (Read Only)</h1>
-      <table className="table">
-        <thead>
-          <tr>
-            <th>ID</th>
-            <th>Image ID</th>
-            <th>Caption</th>
-            <th>Created</th>
-          </tr>
-        </thead>
-        <tbody>
-          {(captions ?? []).length === 0 ? (
+      <div className="table-wrap">
+        <table className="table">
+          <thead>
             <tr>
-              <td colSpan={4}>No captions found.</td>
+              <th>ID</th>
+              <th>Image ID</th>
+              <th>Caption</th>
+              <th>Created</th>
             </tr>
-          ) : (
-            (captions ?? []).map((caption: Row) => (
-              <tr key={caption.id}>
-                <td>{caption.id}</td>
-                <td>{caption.image_id ?? "-"}</td>
-                <td>{captionText(caption)}</td>
-                <td>{createdAt(caption)}</td>
+          </thead>
+          <tbody>
+            {(captions ?? []).length === 0 ? (
+              <tr>
+                <td colSpan={4}>No captions found.</td>
               </tr>
-            ))
-          )}
-        </tbody>
-      </table>
+            ) : (
+              (captions ?? []).map((caption: Row) => (
+                <tr key={caption.id}>
+                  <td>{caption.id}</td>
+                  <td>{caption.image_id ?? "-"}</td>
+                  <td>{captionText(caption)}</td>
+                  <td>{createdAt(caption)}</td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
     </main>
   );
 }
