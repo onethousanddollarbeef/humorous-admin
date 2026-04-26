@@ -88,12 +88,14 @@ a {
 }
 
 .grid.stats {
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  grid-template-columns: 1fr 1fr 1fr 1.35fr 0.85fr 0.9fr 1.25fr;
+  gap: 14px;
 }
 
 .table {
   width: 100%;
   border-collapse: collapse;
+  table-layout: fixed;
 }
 
 .table th,
@@ -101,6 +103,9 @@ a {
   text-align: left;
   border-bottom: 1px solid #2f2a1b;
   padding: 10px 8px;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .table th {
@@ -197,6 +202,29 @@ button:hover {
   font-weight: 700;
 }
 
+.metric-card h3 {
+  margin: 0;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.metric-card-compact {
+  min-width: 0;
+}
+
+.metric-card-wide {
+  min-width: 0;
+}
+
+.quick-graphs {
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  align-items: start;
+}
+
+.compact-snapshot {
+  padding: 12px;
+}
+
 .image-gallery {
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
 }
@@ -256,6 +284,7 @@ button:hover {
   align-items: center;
   gap: 14px;
   justify-content: space-between;
+  flex-wrap: wrap;
   position: sticky;
   top: 10px;
   z-index: 30;
@@ -273,6 +302,7 @@ button:hover {
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
+  flex: 1 1 520px;
 }
 
 .topbar-link {
@@ -318,10 +348,6 @@ button:hover {
   display: block;
 }
 
-.quick-graphs {
-  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
-}
-
 .graph-list {
   display: grid;
   gap: 10px;
@@ -362,7 +388,7 @@ button:hover {
 
 .rating-summary-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  grid-template-columns: repeat(4, minmax(120px, 1fr));
   gap: 10px;
 }
 
@@ -388,4 +414,30 @@ button:hover {
 .compact-table td,
 .compact-table th {
   padding: 8px 6px;
+}
+
+.table-wrap {
+  width: 100%;
+  overflow: hidden;
+}
+
+.table-wrap .table {
+  min-width: 0;
+}
+
+.input-row {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.inline-edit-form {
+  display: grid;
+  gap: 8px;
+}
+
+.inline-edit-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
 }
