@@ -16,7 +16,6 @@ function pickImageUrl(row: Row) {
     row.url ??
     row.image_url ??
     row.src ??
-    row.path ??
     row.storage_url ??
     row.public_url ??
     row.original_url ??
@@ -68,7 +67,14 @@ export default async function DashboardPage() {
     { data: flavorRows },
     { data: imageRows },
     { data: captionRows },
-    { data: flavorMixRows }
+    { data: flavorMixRows },
+    { data: flavorStepRows },
+    { data: flavorThemeRows },
+    captionScoresQuery,
+    captionVotesQuery,
+    captionRatingsQuery,
+    captionVoteUpCountQuery,
+    captionVoteDownCountQuery
   ] = await Promise.all([
     supabase.from("profiles").select("id", { count: "exact", head: true }),
     supabase.from("images").select("id", { count: "exact", head: true }),
@@ -80,22 +86,53 @@ export default async function DashboardPage() {
     supabase.from("humor_flavors").select("*").limit(50),
     supabase.from("images").select("*").limit(500),
     supabase.from("captions").select("*").limit(500),
-    supabase.from("humor_flavor_mix").select("*").limit(500)
+    supabase.from("humor_flavor_mix").select("*").limit(500),
+    supabase.from("humor_flavor_steps").select("*").limit(500),
+    supabase.from("humor_flavor_theme_mappings").select("*").limit(500),
+    supabase.from("caption_scores").select("*").limit(5000),
+    supabase.from("caption_votes").select("*").limit(5000),
+    supabase.from("caption_ratings").select("*").limit(5000),
+    supabase.from("caption_votes").select("id", { count: "exact", head: true }).gt("vote_value", 0),
+    supabase.from("caption_votes").select("id", { count: "exact", head: true }).lt("vote_value", 0)
   ]);
 
   const flavors = (flavorRows ?? []) as Row[];
   const captionData = (captionRows ?? []) as Row[];
+  const captionScoresRows = !captionScoresQuery?.error ? ((captionScoresQuery?.data ?? []) as Row[]) : [];
+  const ratingRows = !captionVotesQuery?.error
+    ? ((captionVotesQuery?.data ?? []) as Row[])
+    : !captionScoresQuery?.error
+      ? ((captionScoresQuery?.data ?? []) as Row[])
+      : !captionRatingsQuery?.error
+        ? ((captionRatingsQuery?.data ?? []) as Row[])
+        : [];
   const imagesByFlavor = new Map<string, Row>();
   const imagesById = new Map<string, Row>();
   const imageCounts = new Map<string, number>();
   const captionCounts = new Map<string, number>();
+  const flavorAliasToId = new Map<string, string>();
+
+  for (const flavor of flavors) {
+    const flavorId = normalizeText(flavor.id);
+    if (!flavorId) continue;
+    for (const alias of [flavor.id, flavor.slug, flavor.name, flavor.flavor_name, flavor.title]) {
+      const key = normalizeText(alias);
+      if (key) flavorAliasToId.set(key, flavorId);
+    }
+  }
+
+  const resolveFlavorId = (raw: unknown) => {
+    const key = normalizeText(raw);
+    if (!key) return "";
+    return flavorAliasToId.get(key) ?? key;
+  };
 
   for (const image of imageRows ?? []) {
     const row = image as Row;
     const imageId = normalizeText(row.id);
     if (imageId) imagesById.set(imageId, row);
 
-    const flavorId = normalizeText(row.humor_flavor_id ?? row.flavor_id ?? row.humor_flavor_slug ?? row.flavor_slug);
+    const flavorId = resolveFlavorId(row.humor_flavor_id ?? row.flavor_id ?? row.humor_flavor_slug ?? row.flavor_slug);
     if (!flavorId) continue;
     if (!imagesByFlavor.has(flavorId) && pickImageUrl(row)) imagesByFlavor.set(flavorId, row);
     imageCounts.set(flavorId, (imageCounts.get(flavorId) ?? 0) + 1);
@@ -103,7 +140,7 @@ export default async function DashboardPage() {
 
   for (const mix of flavorMixRows ?? []) {
     const row = mix as Row;
-    const flavorId = normalizeText(row.humor_flavor_id ?? row.flavor_id);
+    const flavorId = resolveFlavorId(row.humor_flavor_id ?? row.flavor_id ?? row.humor_flavor_slug ?? row.flavor_slug);
     const imageId = normalizeText(row.image_id ?? row.source_image_id);
     const image = imagesById.get(imageId);
     if (flavorId && image && pickImageUrl(image) && !imagesByFlavor.has(flavorId)) {
@@ -112,8 +149,36 @@ export default async function DashboardPage() {
     if (flavorId) imageCounts.set(flavorId, Math.max(imageCounts.get(flavorId) ?? 0, 1));
   }
 
+  for (const step of flavorStepRows ?? []) {
+    const row = step as Row;
+    const flavorId = resolveFlavorId(
+      row.humor_flavor_id ?? row.flavor_id ?? row.humor_flavor_slug ?? row.flavor_slug ?? row.parent_flavor_id
+    );
+    const imageId = normalizeText(row.image_id ?? row.source_image_id ?? row.reference_image_id ?? row.primary_image_id);
+    const image = imagesById.get(imageId);
+    if (flavorId && image && pickImageUrl(image) && !imagesByFlavor.has(flavorId)) {
+      imagesByFlavor.set(flavorId, image);
+    }
+    if (flavorId) imageCounts.set(flavorId, Math.max(imageCounts.get(flavorId) ?? 0, 1));
+  }
+
+  for (const theme of flavorThemeRows ?? []) {
+    const row = theme as Row;
+    const flavorId = resolveFlavorId(
+      row.humor_flavor_id ?? row.flavor_id ?? row.humor_flavor_slug ?? row.flavor_slug ?? row.parent_flavor_id
+    );
+    const imageId = normalizeText(row.image_id ?? row.source_image_id ?? row.reference_image_id ?? row.primary_image_id);
+    const image = imagesById.get(imageId);
+    if (flavorId && image && pickImageUrl(image) && !imagesByFlavor.has(flavorId)) {
+      imagesByFlavor.set(flavorId, image);
+    }
+    if (flavorId) imageCounts.set(flavorId, Math.max(imageCounts.get(flavorId) ?? 0, 1));
+  }
+
   for (const caption of captionData) {
-    const flavorId = normalizeText(caption.humor_flavor_id ?? caption.flavor_id ?? caption.humor_flavor_slug ?? caption.flavor_slug);
+    const flavorId = resolveFlavorId(
+      caption.humor_flavor_id ?? caption.flavor_id ?? caption.humor_flavor_slug ?? caption.flavor_slug
+    );
     if (!flavorId) continue;
     captionCounts.set(flavorId, (captionCounts.get(flavorId) ?? 0) + 1);
   }
@@ -124,88 +189,190 @@ export default async function DashboardPage() {
   let totalRatings = 0;
   let weightedScoreSum = 0;
 
-  const topRatedCaptions = [...captionData]
-    .map((row) => {
-      const upvotes = toNumber(row.upvotes ?? row.likes ?? row.positive_votes);
-      const downvotes = toNumber(row.downvotes ?? row.dislikes ?? row.negative_votes);
-      const votes = toNumber(row.vote_count ?? row.rating_count ?? upvotes + downvotes);
-      const score = toNumber(row.avg_vote ?? row.average_vote ?? row.score ?? row.rating);
-      const resolvedVotes = votes || upvotes + downvotes;
+  const captionTextById = new Map<string, string>();
+  for (const caption of captionData) {
+    const captionId = normalizeText(caption.id);
+    if (captionId) captionTextById.set(captionId, pickCaptionBody(caption));
+  }
 
-      totalUpvotes += upvotes;
-      totalDownvotes += downvotes;
-      totalRatings += resolvedVotes;
-      weightedScoreSum += score * Math.max(1, resolvedVotes);
+  const voteByCaptionId = new Map<string, { upvotes: number; downvotes: number; votes: number; scoreSum: number }>();
 
-      return {
-        id: normalizeText(row.id),
-        text: pickCaptionBody(row),
-        score,
-        votes: resolvedVotes,
-        upvotes,
-        downvotes
-      };
-    })
-    .filter((row) => row.votes > 0 || row.score !== 0)
+  for (const rating of ratingRows) {
+    const captionId = normalizeText(
+      rating.caption_id ?? rating.target_caption_id ?? rating.captions_id ?? rating.caption_example_id
+    );
+    if (!captionId) continue;
+    const existing = voteByCaptionId.get(captionId) ?? { upvotes: 0, downvotes: 0, votes: 0, scoreSum: 0 };
+    const vote = toNumber(
+      rating.vote ??
+        rating.vote_value ??
+        rating.score ??
+        rating.rating ??
+        rating.score_value ??
+        rating.value ??
+        (rating.is_upvote === true ? 1 : rating.is_upvote === false ? -1 : 0)
+    );
+
+    if (vote > 0) existing.upvotes += 1;
+    else if (vote < 0) existing.downvotes += 1;
+
+    if (vote !== 0) {
+      existing.votes += 1;
+      existing.scoreSum += vote;
+    }
+
+    voteByCaptionId.set(captionId, existing);
+  }
+
+  const unresolvedCaptionIds = Array.from(voteByCaptionId.keys()).filter((id) => !captionTextById.has(id));
+  if (unresolvedCaptionIds.length > 0) {
+    const { data: extraCaptionRows } = await supabase.from("captions").select("*").in("id", unresolvedCaptionIds.slice(0, 5000));
+    for (const caption of extraCaptionRows ?? []) {
+      const row = caption as Row;
+      const captionId = normalizeText(row.id);
+      if (captionId && !captionTextById.has(captionId)) captionTextById.set(captionId, pickCaptionBody(row));
+    }
+  }
+
+  // Primary top list source: caption_scores table (display_text + total_votes).
+  let topRatedCaptions = captionScoresRows
+    .map((row) => ({
+      id: normalizeText(row.id),
+      text: normalizeText(row.display_text),
+      score: toNumber(row.total_votes ?? row.vote_total),
+      votes: Math.abs(toNumber(row.total_votes ?? row.vote_total)),
+      upvotes: 0,
+      downvotes: 0
+    }))
+    .filter((row) => row.text)
     .sort((a, b) => {
       if (b.score !== a.score) return b.score - a.score;
       return b.votes - a.votes;
     })
     .slice(0, 8);
 
-  const netVotes = totalUpvotes - totalDownvotes;
-  const weightedAvgScore = totalRatings > 0 ? weightedScoreSum / totalRatings : 0;
+  if (topRatedCaptions.length === 0) {
+    topRatedCaptions = Array.from(voteByCaptionId.entries())
+      .map(([captionId, agg]) => {
+        const score = agg.scoreSum;
+        const text = captionTextById.get(captionId) ?? `Caption ID: ${captionId}`;
+
+        totalUpvotes += agg.upvotes;
+        totalDownvotes += agg.downvotes;
+        totalRatings += agg.votes;
+        weightedScoreSum += score * Math.max(1, agg.votes);
+
+        return {
+          id: captionId,
+          text,
+          score,
+          votes: agg.votes,
+          upvotes: agg.upvotes,
+          downvotes: agg.downvotes
+        };
+      })
+      .sort((a, b) => {
+        if (b.score !== a.score) return b.score - a.score;
+        return b.votes - a.votes;
+      })
+      .slice(0, 8);
+  }
+
+  // Fallback path when rating rows are missing: use denormalized caption columns.
+  if (topRatedCaptions.length === 0) {
+    topRatedCaptions = [...captionData]
+      .map((row) => {
+        const upvotes = toNumber(row.upvotes ?? row.likes ?? row.positive_votes);
+        const downvotes = toNumber(row.downvotes ?? row.dislikes ?? row.negative_votes);
+        const votes = toNumber(row.vote_count ?? row.rating_count ?? upvotes + downvotes);
+        const score = toNumber(row.avg_vote ?? row.average_vote ?? row.score ?? row.rating);
+        const resolvedVotes = votes || upvotes + downvotes;
+
+        totalUpvotes += upvotes;
+        totalDownvotes += downvotes;
+        totalRatings += resolvedVotes;
+        weightedScoreSum += score * Math.max(1, resolvedVotes);
+
+        return {
+          id: normalizeText(row.id),
+          text: pickCaptionBody(row),
+          score,
+          votes: resolvedVotes,
+          upvotes,
+          downvotes
+        };
+      })
+      .filter((row) => row.votes > 0 || row.score !== 0)
+      .sort((a, b) => {
+        if (b.score !== a.score) return b.score - a.score;
+        return b.votes - a.votes;
+      })
+      .slice(0, 8);
+  }
+
+  let summaryUpvotes = totalUpvotes;
+  let summaryDownvotes = totalDownvotes;
+  let summaryTotalRatings = totalRatings;
+  let summaryWeightedAvgScore = totalRatings > 0 ? weightedScoreSum / totalRatings : 0;
+
+  if (!captionVoteUpCountQuery?.error && !captionVoteDownCountQuery?.error) {
+    summaryUpvotes = captionVoteUpCountQuery.count ?? summaryUpvotes;
+    summaryDownvotes = captionVoteDownCountQuery.count ?? summaryDownvotes;
+    summaryTotalRatings = summaryUpvotes + summaryDownvotes;
+    summaryWeightedAvgScore = summaryTotalRatings > 0 ? (summaryUpvotes - summaryDownvotes) / summaryTotalRatings : 0;
+  }
+
+  const netVotes = summaryUpvotes - summaryDownvotes;
 
   const maxImageCount = Math.max(1, ...Array.from(imageCounts.values()));
   const maxCaptionCount = Math.max(1, ...Array.from(captionCounts.values()));
 
   return (
     <main className="grid" style={{ gap: 16 }}>
-      <h1>Analytics</h1>
-      <p className="admin-sidebar-subtitle" style={{ marginTop: -8 }}>Flavor overview with image previews</p>
+      <h1>😂 Analytics 😂</h1>
 
       <section className="grid stats">
-        <div className="card metric-card">
+        <div className="card metric-card metric-card-regular">
           <h3>Users</h3>
           <p>{users ?? 0}</p>
         </div>
-        <div className="card metric-card">
+        <div className="card metric-card metric-card-regular">
           <h3>Images</h3>
           <p>{images ?? 0}</p>
         </div>
-        <div className="card metric-card">
+        <div className="card metric-card metric-card-regular">
           <h3>Captions</h3>
           <p>{captions ?? 0}</p>
         </div>
-        <div className="card metric-card">
+        <div className="card metric-card metric-card-wide">
           <h3>Caption Requests</h3>
           <p>{requests ?? 0}</p>
         </div>
-        <div className="card metric-card">
+        <div className="card metric-card metric-card-compact">
           <h3>Terms</h3>
           <p>{terms ?? 0}</p>
         </div>
-        <div className="card metric-card">
+        <div className="card metric-card metric-card-compact">
           <h3>LLM Models</h3>
           <p>{models ?? 0}</p>
         </div>
-        <div className="card metric-card">
+        <div className="card metric-card metric-card-wide">
           <h3>Allowed Domains</h3>
           <p>{domains ?? 0}</p>
         </div>
       </section>
 
       <section className="grid quick-graphs">
-        <article className="card">
+        <article className="card compact-snapshot">
           <h3>Caption Rating Snapshot</h3>
           <div className="rating-summary-grid">
             <div>
               <span>Total Upvotes</span>
-              <strong>{totalUpvotes}</strong>
+              <strong>{summaryUpvotes}</strong>
             </div>
             <div>
               <span>Total Downvotes</span>
-              <strong>{totalDownvotes}</strong>
+              <strong>{summaryDownvotes}</strong>
             </div>
             <div>
               <span>Net Votes</span>
@@ -213,37 +380,39 @@ export default async function DashboardPage() {
             </div>
             <div>
               <span>Weighted Avg Score</span>
-              <strong>{weightedAvgScore.toFixed(2)}</strong>
+              <strong>{summaryWeightedAvgScore.toFixed(2)}</strong>
             </div>
           </div>
         </article>
 
         <article className="card">
           <h3>Top Rated Captions</h3>
-          <table className="table compact-table">
-            <thead>
-              <tr>
-                <th>Caption</th>
-                <th>Score</th>
-                <th>Votes</th>
-              </tr>
-            </thead>
-            <tbody>
-              {topRatedCaptions.length === 0 ? (
+          <div className="table-wrap">
+            <table className="table compact-table">
+              <thead>
                 <tr>
-                  <td colSpan={3}>No rated captions found yet.</td>
+                  <th>Caption</th>
+                  <th>Score</th>
+                  <th>Votes</th>
                 </tr>
-              ) : (
-                topRatedCaptions.map((caption) => (
-                  <tr key={caption.id || caption.text.slice(0, 12)}>
-                    <td>{ellipsize(caption.text, 100)}</td>
-                    <td>{caption.score.toFixed(2)}</td>
-                    <td>{caption.votes}</td>
+              </thead>
+              <tbody>
+                {topRatedCaptions.length === 0 ? (
+                  <tr>
+                    <td colSpan={3}>No rated captions found yet.</td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                ) : (
+                  topRatedCaptions.map((caption) => (
+                    <tr key={caption.id || caption.text.slice(0, 12)}>
+                      <td>{ellipsize(caption.text, 100)}</td>
+                      <td>{caption.score.toFixed(2)}</td>
+                      <td>{caption.votes}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </article>
       </section>
 
